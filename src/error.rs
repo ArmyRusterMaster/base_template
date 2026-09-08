@@ -57,7 +57,11 @@ impl IntoResponse for AppError {
         // Полные детали — только во внутренние логи.
         tracing::error!(%code, %status, error = ?self, "ошибка запроса");
 
-        (status, Json(json!({ "error": { "code": code, "message": message } }))).into_response()
+        (
+            status,
+            Json(json!({ "error": { "code": code, "message": message } })),
+        )
+            .into_response()
     }
 }
 
