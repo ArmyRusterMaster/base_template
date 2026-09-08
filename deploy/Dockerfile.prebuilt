@@ -1,0 +1,28 @@
+# Рантайм-образ для CI из ЗАРАНЕЕ СОБРАННОГО артефакта:
+# в контекст кладут musl-статический бинарник + site + config
+# (см. джобу docker в .github/workflows/ci.yaml).
+#
+# Полная мультистейдж-сборка (Ubuntu → Alpine, cargo-chef) — в deploy/Dockerfile.
+FROM alpine:3.20
+
+# Минимальный рантайм: сертификаты + непривилегированный пользователь.
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S app && adduser -S app -G app
+
+# Рантайм-конфигурация Leptos: сайт лежит не в рабочей директории.
+ENV LEPTOS_SITE_ROOT=/app/site \
+    LEPTOS_SITE_PKG_DIR=pkg \
+    APP_SERVER_HOST=0.0.0.0 \
+    APP_SERVER_PORT=3000
+
+WORKDIR /app
+
+# Статика (JS/WASM/CSS), конфиг и исполняемый файл сервера (musl-статик).
+COPY --chown=app:app site ./site
+COPY --chown=app:app config ./config
+COPY --chown=app:app base_template ./base_template
+
+EXPOSE 3000
+
+USER app
+CMD ["/app/base_template"]
