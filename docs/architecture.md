@@ -31,7 +31,7 @@
 3. `Router` монтирует `leptos_routes` — на каждый маршрут рендерится `shell`
    (HTML-каркас с hydration-скриптами).
 4. `fallback(leptos_axum::file_and_error_handler)`:
-   - отдаёт статику из site-root (JS/WASM/CSS, включая предсжатые `.gz/.br`),
+   - отдаёт статику из site-root (JS/WASM/CSS),
    - 404-маршруты и ошибки возвращает в `shell`.
 
 ### Клиент (feature `hydrate`)

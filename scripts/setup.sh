@@ -125,25 +125,10 @@ else
     echo "✅ cargo-audit уже установлен."
 fi
 
-# 5. УСТАНОВКА И ГЛОБАЛЬНАЯ НАСТРОЙКА SCCACHE
-if ! command -v sccache &> /dev/null; then
-    echo "📦 Установка sccache (кэш компиляции)..."
-    cargo install --locked sccache
-else
-    echo "✅ sccache уже установлен."
-fi
-
-# Интеграция sccache в профиль пользователя, чтобы он работал глобально во всех проектах
-SHELL_RC=""
-if [ -f "$HOME/.bashrc" ]; then SHELL_RC="$HOME/.bashrc"; fi
-if [ -f "$HOME/.zshrc" ]; then SHELL_RC="$HOME/.zshrc"; fi
-
-if [ -n "$SHELL_RC" ]; then
-    if ! grep -q "RUSTC_WRAPPER" "$SHELL_RC"; then
-        echo -e "\n# Глобальный кэш компиляции Rust\nexport RUSTC_WRAPPER=sccache" >> "$SHELL_RC"
-        echo "📝 Переменная RUSTC_WRAPPER добавленна в $SHELL_RC"
-    fi
-fi
+# 5. SCCACHE НЕ ИСПОЛЬЗУЕТСЯ
+# sccache сознательно не ставится: в этом проекте обёртка компилятора отключена
+# в .cargo/config.toml (rustc-wrapper = ""), т.к. sccache падает на Windows
+# при компиляции web-sys (слишком длинная командная строка rustc).
 
 # --- 5. УСТАНОВКА ЗАВИСИМОСТЕЙ ПРОЕКТА ---
 if [ -f "package.json" ]; then
@@ -151,5 +136,4 @@ if [ -f "package.json" ]; then
     npm install
 fi
 
-echo "✅ Окружение готово к инди-хакингу с супер-быстрой сборкой!"
-echo "💡 Чтобы применить настройки sccache прямо сейчас, выполните: source $SHELL_RC"
+echo "✅ Окружение готово к инди-хакингу!"

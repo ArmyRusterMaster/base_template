@@ -36,6 +36,10 @@
   для воспроизводимости; строка в `.gitignore` убрана.
 - `serde_yaml` помечен как deprecated в crates.io (проект переезжает на
   `serde_yml`/`yaml-rust2`) — при обновлении провести миграцию в `src/config.rs`.
+- **sccache отключён локально**: в `.cargo/config.toml` проекта задано
+  `rustc-wrapper = ""` (перекрывает глобальный конфиг машины), т.к. sccache
+  падает на Windows при компиляции web-sys. В `scripts/setup.sh` sccache
+  не устанавливается.
 - WASM-зависимости (feature `hydrate`) в Docker кешируются не полностью —
   для них отдельный `cargo chef cook` с `--features hydrate` может заметно
   ускорить сборку (план: [roadmap.md](roadmap.md)).

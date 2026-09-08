@@ -1,6 +1,8 @@
 [build]
-# Принудительное использование кэша sccache для сборки
-rustc-wrapper = "sccache"
+# Пустая строка ОТКЛЮЧАЕТ rustc-wrapper из глобального ~/.cargo/config.toml.
+# Причина: sccache 0.17 падает с "failed to spawn rustc.exe" на web-sys
+# (гигантская командная строка компилятора на Windows).
+rustc-wrapper = ""
 
 # --- Настройки для Linux ---
 [target.x86_64-unknown-linux-gnu]
