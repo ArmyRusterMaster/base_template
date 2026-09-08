@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 ЗАПУСК ПОДГОТОВКИ ОКРУЖЕНИЯ РАЗРАБОТЧИКА (Rust + Leptos + Axum + Docker + Node)..."
+echo "🚀 ЗАПУСК ПОДГОТОВКИ ОКРУЖЕНИЯ РАЗРАБОТЧИКА (Rust + Leptos + Axum + Docker + Node + Сверхбыстрая сборка)..."
 
 # --- 0. ОПРЕДЕЛЕНИЕ ДИСТРИБУТИВА И ПАКЕТНОГО МЕНЕДЖЕРА ---
 if command -v apt-get &> /dev/null; then
@@ -10,28 +10,31 @@ if command -v apt-get &> /dev/null; then
     INSTALL_CMD="sudo apt-get install -y"
     DOCKER_PKGS="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
     NODE_PKGS="nodejs"
-    DEPS_PKGS="ca-certificates curl gnupg build-essential"
+    # Для apt ставим lld и clang
+    DEPS_PKGS="ca-certificates curl gnupg build-essential lld clang"
 elif command -v pacman &> /dev/null; then
     PM="pacman"
     UPDATE_CMD="sudo pacman -Sy"
     INSTALL_CMD="sudo pacman -S --noconfirm"
     DOCKER_PKGS="docker docker-compose"
     NODE_PKGS="nodejs npm"
-    DEPS_PKGS="base-devel curl"
+    # В Arch lld идет в комплекте или ставится отдельно
+    DEPS_PKGS="base-devel curl lld clang"
 elif command -v dnf &> /dev/null; then
     PM="dnf"
     UPDATE_CMD="sudo dnf check-update || true"
     INSTALL_CMD="sudo dnf install -y"
     DOCKER_PKGS="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
     NODE_PKGS="nodejs"
-    DEPS_PKGS="curl @development-tools"
+    # Для Fedora/RHEL
+    DEPS_PKGS="curl @development-tools lld clang"
 elif command -v zypper &> /dev/null; then
     PM="zypper"
     UPDATE_CMD="sudo zypper refresh"
     INSTALL_CMD="sudo zypper install -y"
     DOCKER_PKGS="docker docker-compose"
     NODE_PKGS="nodejs npm"
-    DEPS_PKGS="curl -t pattern devel_basis"
+    DEPS_PKGS="curl -t pattern devel_basis lld clang"
 else
     echo "❌ Ошибка: Не удалось определить пакетный менеджер (поддерживаются apt, pacman, dnf, zypper)."
     exit 1
@@ -40,7 +43,7 @@ fi
 echo "📦 Определен пакетный менеджер: $PM. Обновляем репозитории..."
 $UPDATE_CMD
 
-echo "🧰 Установка базовых инструментов сборки (компиляторы, curl)..."
+echo "🧰 Установка базовых инструментов сборки, компиляторов и линкера LLD..."
 $INSTALL_CMD $DEPS_PKGS
 
 # --- 1. ПРОВЕРКА И УСТАНОВКА DOCKER ---
@@ -100,7 +103,7 @@ rustup target add wasm32-unknown-unknown
 
 # 2. Установка cargo-leptos для сборки и live-reload
 if ! command -v cargo-leptos &> /dev/null; then
-    echo "📦 Установка cargo-leptos (это может занять некоторое время)..."
+    echo "📦 Установка cargo-leptos..."
     cargo install --locked cargo-leptos
 else
     echo "✅ cargo-leptos уже установлен."
@@ -111,7 +114,7 @@ if ! command -v leptosfmt &> /dev/null; then
     echo "📦 Установка leptosfmt..."
     cargo install --locked leptosfmt
 else
-    echo "✅ leptosfmt уже установлен."
+    echo "✅ leptosfmt already installed."
 fi
 
 # 4. Установка утилит безопасности и аудита
@@ -122,10 +125,31 @@ else
     echo "✅ cargo-audit уже установлен."
 fi
 
+# 5. УСТАНОВКА И ГЛОБАЛЬНАЯ НАСТРОЙКА SCCACHE
+if ! command -v sccache &> /dev/null; then
+    echo "📦 Установка sccache (кэш компиляции)..."
+    cargo install --locked sccache
+else
+    echo "✅ sccache уже установлен."
+fi
+
+# Интеграция sccache в профиль пользователя, чтобы он работал глобально во всех проектах
+SHELL_RC=""
+if [ -f "$HOME/.bashrc" ]; then SHELL_RC="$HOME/.bashrc"; fi
+if [ -f "$HOME/.zshrc" ]; then SHELL_RC="$HOME/.zshrc"; fi
+
+if [ -n "$SHELL_RC" ]; then
+    if ! grep -q "RUSTC_WRAPPER" "$SHELL_RC"; then
+        echo -e "\n# Глобальный кэш компиляции Rust\nexport RUSTC_WRAPPER=sccache" >> "$SHELL_RC"
+        echo "📝 Переменная RUSTC_WRAPPER добавленна в $SHELL_RC"
+    fi
+fi
+
 # --- 5. УСТАНОВКА ЗАВИСИМОСТЕЙ ПРОЕКТА ---
 if [ -f "package.json" ]; then
     echo "📦 Файл package.json найден. Синхронизируем node-зависимости (Tailwind и др.)..."
     npm install
 fi
 
-echo "✅ Окружение готово к инди-хакингу!"
+echo "✅ Окружение готово к инди-хакингу с супер-быстрой сборкой!"
+echo "💡 Чтобы применить настройки sccache прямо сейчас, выполните: source $SHELL_RC"

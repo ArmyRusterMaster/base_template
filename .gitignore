@@ -1,10 +1,20 @@
+# Отладочные и сборочные артефакты
 debug/
 target/
 
-Cargo.lock
+# Локальное окружение и секреты
+.env
+.env.local
+*.local
 
+# Резервные копии Rust-файлов
 **/*.rs.bk
 
+# Логи
+*.log
+
+# Windows
 *.pdb
 
+# Node
 /node

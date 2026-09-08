@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # --- Качество и юнит-тесты ------------------------------------------------
+  check:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --features ssr --all-targets -- -D warnings
+      - name: Unit tests
+        run: cargo test --features ssr
+
+  # Полный пайплайн cargo-leptos (SSR + WASM + SCSS) -------------------------
+  build-release:
+    name: cargo-leptos build (release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-leptos
+        run: cargo install cargo-leptos --locked
+      - name: Build
+        run: cargo-leptos build --release
+      - name: Smoke-test server
+        run: |
+          APP_SERVER_HOST=0.0.0.0 ./target/release/base_template &
+          sleep 5
+          curl -fsS http://127.0.0.1:3000/ | grep -q "Welcome to Leptos"
+
+  # E2E (Playwright) ----------------------------------------------------------
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-leptos
+        run: cargo install cargo-leptos --locked
+      - name: Install npm deps
+        run: npm ci
+        working-directory: end2end
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: end2end
+      - name: Build (release)
+        run: cargo-leptos build --release
+      - name: Start server
+        run: |
+          APP_SERVER_HOST=0.0.0.0 ./target/release/base_template &
+          sleep 5
+      - name: Run E2E tests
+        run: npx playwright test
+        working-directory: end2end
+
+  # Docker image -------------------------------------------------------------
+  docker:
+    name: Docker image build + smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f deploy/Dockerfile -t base-template:ci .
+      - name: Smoke-test container
+        run: |
+          docker run -d --name smoke -p 3000:3000 base-template:ci
+          sleep 5
+          curl -fsS http://127.0.0.1:3000/ | grep -q "Welcome to Leptos"
+          docker rm -f smoke

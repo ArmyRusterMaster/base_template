@@ -1,0 +1,28 @@
+# Докер-композ для base_template.
+# Запуск:  docker compose -f deploy/docker-compose.yaml up --build
+# Документация: docs/deployment.md
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: base-template:latest
+    container_name: base-template
+    environment:
+      # Перекрывают config/app.yaml (приоритет слоя: env > yaml > дефолт).
+      # В образе уже задано host=0.0.0.0/port=3000 — здесь они продублированы для явности.
+      APP_APP_NAME: base_template
+      APP_SERVER_HOST: "0.0.0.0"
+      APP_SERVER_PORT: "3000"
+      # Параметры Leptos (site-root в Docker — /app/site, см. ENV в Dockerfile).
+      # LEPTOS_SITE_ROOT: /app/site
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

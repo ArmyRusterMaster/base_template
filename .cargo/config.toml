@@ -1,0 +1,18 @@
+[build]
+# Принудительное использование кэша sccache для сборки
+rustc-wrapper = "sccache"
+
+# --- Настройки для Linux ---
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld", # Используем быстрый линкер LLD
+    "-C", "target-cpu=native"      # Максимальная оптимизация под текущий процессор
+]
+
+# --- Настройки для Windows (если разрабатываете на ней) ---
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld", # Используем быстрый линкер LLD
+    "-C", "target-cpu=native"      # Максимальная оптимизация под текущий процессор
+]

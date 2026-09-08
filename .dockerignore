@@ -1,0 +1,13 @@
+# Контекст сборки Docker-образа — исключаем всё, что не нужно при сборке.
+# ВАЖНО: .cargo оставляем НА ХОСТЕ (там sccache/lld для локальной разработки),
+# в образ конфиг тулчейна хоста не должен попадать — у него свой тулчейн.
+.git
+.cargo
+target
+node_modules
+end2end/node_modules
+end2end/test-results
+end2end/playwright-report
+.env
+*.log
+docs
