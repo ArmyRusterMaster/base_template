@@ -52,6 +52,9 @@ impl std::error::Error for ConfigError {}
 pub struct AppConfig {
     /// Имя приложения (используется в логах и авторелоаде).
     pub app_name: String,
+    /// Уровень логов: `trace` | `debug` | `info` | `warn` | `error`.
+    /// Переопределяется `RUST_LOG` (см. `src/logging.rs`).
+    pub log_level: String,
     /// Конфигурация HTTP-сервера.
     pub server: ServerConfig,
 }
@@ -70,6 +73,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             app_name: "base_template".to_owned(),
+            log_level: "info".to_owned(),
             server: ServerConfig::default(),
         }
     }
@@ -103,6 +107,9 @@ impl AppConfig {
     fn apply_env(mut self) -> Result<Self> {
         if let Ok(v) = std::env::var("APP_APP_NAME") {
             self.app_name = v;
+        }
+        if let Ok(v) = std::env::var("APP_LOG_LEVEL") {
+            self.log_level = v;
         }
         if let Ok(v) = std::env::var("APP_SERVER_HOST") {
             self.server.host = v;
