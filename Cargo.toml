@@ -17,9 +17,11 @@ tokio = { version = "1", features = ["rt-multi-thread", "signal", "macros"], opt
 wasm-bindgen = { version = "0.2.106", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
+# leptos-use 0.19.x совместим с leptos 0.8 (см. docs/stack.md).
 leptos-use = "0.19.2"
-leptos-fetch = "0.4.10"
-thaw = "0.4.8"
+# thaw-ui (0.4.x) требует leptos 0.7 и с 0.8 несовместим — не используется.
+# Интеграционные библиотеки добавляются в шаблонах-наследниках осознанно
+# (с проверкой совместимости версий leptos).
 tracing = { version = "0.1.44", optional = true }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"], optional = true }
 tower-http = { version = "0.6", features = ["request-id"], optional = true }
@@ -32,7 +34,6 @@ hydrate = [
     "leptos/hydrate",
     "dep:console_error_panic_hook",
     "dep:wasm-bindgen",
-    "thaw/hydrate",
 ]
 ssr = [
     "dep:axum",
@@ -47,8 +48,6 @@ ssr = [
     "dep:async-trait",
     "dep:serde_json",
     "leptos-use/ssr",
-    "leptos-fetch/ssr",
-    "thaw/ssr",
 ]
 
 # Defines a size-optimized profile for the WASM bundle in release mode
@@ -70,8 +69,10 @@ site-root = "target/site"
 # Defaults to pkg
 site-pkg-dir = "pkg"
 
-# [Optional] The source CSS file. If it ends with .sass or .scss then it will be compiled by dart-sass into CSS. The CSS is optimized by Lightning CSS before being written to <site-root>/<site-pkg>/base_template.css
-style-file = "style/main.scss"
+# Tailwind CSS: входной файл (v4, CSS-first конфигурация). cargo-leptos сам
+# скачивает standalone-бинарник Tailwind (версия — LEPTOS_TAILWIND_VERSION,
+# по умолчанию v4.x) и кладёт результат в <site-root>/<site-pkg-dir>/<output-name>.css.
+tailwind-input-file = "style/main.css"
 # Assets source dir. All files found here will be copied and synchronized to site-root.
 # The assets-dir cannot have a sub directory with the same name/path as site-pkg-dir.
 #

@@ -1,0 +1,36 @@
+/* ==========================================================================
+ * Tailwind CSS v4 (CSS-first конфигурация).
+ *
+ * Сборка: cargo-leptos (<tailwind-input-file> в Cargo.toml) скачивает
+ * standalone-бинарник Tailwind (версия — LEPTOS_TAILWIND_VERSION, по умолчанию
+ * v4.x), прогоняет его по этому файлу и кладёт результат в
+ * <site-root>/<site-pkg-dir>/<output-name>.css = target/site/pkg/base_template.css
+ * (этот же путь указан в <Stylesheet> в src/app.rs).
+ *
+ * JavaScript-конфиг (tailwind.config.js) в v4 не нужен: тема описывается
+ * директивой @theme, источники классов — директивой @source.
+ * ========================================================================== */
+
+@import "tailwindcss";
+
+/* Явный список источников: утилитарные классы живут в view!-макросах Rust. */
+@source "../src";
+
+/* Токены темы. Дефолтная палитра v4 используется напрямую (gray-950,
+   teal-400 и т.д.), здесь добавляются только собственные значения. */
+@theme {
+    /* Акцент шаблона (≈ teal-400 из дефолтной палитры). */
+    --color-brand: oklch(0.704 0.14 182.5);
+}
+
+/* Базовый слой: тёмная цветовая схема и стек шрифтов. */
+@layer base {
+    html {
+        color-scheme: dark;
+    }
+
+    body {
+        font-family:
+            ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+}

@@ -49,6 +49,10 @@ export APP_SERVER_PORT=8080
 ## Параметры Leptos (Cargo.toml / `LEPTOS_*`)
 
 `[package.metadata.leptos]` в `Cargo.toml` задаёт пути сборки (site-root,
-style-file, assets-dir, фичи bin/lib, профиль wasm-release). При необходимости их
-можно переопределить переменными `LEPTOS_*` (например, `LEPTOS_SITE_ROOT` на
-продакшене). В Docker это делает ENV в `deploy/Dockerfile`.
+`tailwind-input-file`, assets-dir, фичи bin/lib, профиль wasm-release). При
+необходимости их можно переопределить переменными `LEPTOS_*` (например,
+`LEPTOS_SITE_ROOT` на продакшене). В Docker это делает ENV в `deploy/Dockerfile`.
+
+Версия standalone-бинарника Tailwind задаётся переменной
+`LEPTOS_TAILWIND_VERSION` (по умолчанию — та, что прошита в cargo-leptos, v4.x);
+менять её стоит только осознанно, вместе с синтаксисом `style/main.css`.

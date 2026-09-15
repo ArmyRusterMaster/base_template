@@ -4,70 +4,108 @@
 коннекторы к внешним сервисам, devcontainer, CD) — в шаблоне микросааса, здесь
 только каркас.
 
-## Сделано
+Статусы: `done` | `in_progress` | `planned`. Обновляется вместе с
+[current-state.md](current-state.md).
 
-- [x] Graceful shutdown (Ctrl+C / SIGTERM).
-- [x] Скрипт окружения `scripts/setup.sh` (Docker, Node, Rust+wasm, cargo-leptos,
-  leptosfmt, cargo-audit; sccache сознательно не ставится).
-- [x] Типизированная конфигурация: YAML (`config/app.yaml`) + env `APP_*`,
-  слои + fail-fast валидация, юнит-тесты.
-- [x] Docker: мультистейдж (Ubuntu→Alpine, cargo-chef, musl-статик) +
-  `Dockerfile.prebuilt` для CI + docker-compose с healthcheck.
-- [x] CI-конвейер: fmt(автокоммит) ∥ clippy → test → build-release(артефакт) →
-  e2e ∥ docker → smoke.
-- [x] sccache отключён локально (`.cargo/config.toml`, `rustc-wrapper = ""`).
-- [x] Документация `docs/`, `docs/current-state.md`.
+## Сделано (фазы 1–6, 8–11)
 
-## План улучшения (v3, поэтапно)
+### Фаза 1. just + setup.sh — **done**
 
-### Фаза 1. just + setup.sh — `justfile` (watch/build/fmt/lint/test/e2e/docker/`precommit`); в setup.sh: установка `just`, `tailwind` CLI (если нет), `git-cliff` (опционально, через binstall).
+- [x] `justfile` (watch/build/serve/fmt/fmt-check/lint/test/doc/audit/e2e/docker/
+  precommit/clean).
+- [x] `scripts/setup.sh`: cargo-binstall, `just`, `git-cliff`, `rustfmt`/`clippy`,
+  npm-зависимости e2e.
+- [x] Осознанное отклонение: **tailwind CLI не ставится** — standalone-бинарник
+  скачивает cargo-leptos (`LEPTOS_TAILWIND_VERSION`), глобальная версия могла бы
+  разойтись с ожидаемой (см. [asset-pipeline.md](asset-pipeline.md)).
 
-### Фаза 2. Observability — `tracing` + `tracing-subscriber(env-filter)`;
-`src/logging.rs` (RUST_LOG → APP_LOG_LEVEL → info); поле `log_level` в конфиге;
-request-id middleware (tower-http `request-id`); замена `log!`/`println!`.
+### Фаза 2. Observability — **done**
 
-### Фаза 3. Инфраструктурный AppError — `src/error.rs`: Config/Internal/NotFound,
-`IntoResponse` (JSON, без деталей наружу), `From`-конверсии, тесты. Внутренний
-каркас: наследники маппят в доменные ошибки.
+- [x] `tracing` + `tracing-subscriber(env-filter)`, `src/logging.rs`
+  (`RUST_LOG` → `APP_LOG_LEVEL` → `info`), поле `log_level` в конфиге.
+- [x] request-id middleware (`tower-http`), `x-request-id` в ответе; закрыт
+  e2e-тестом.
 
-### Фаза 4. Трейты коннекторов — `src/connectors/`: trait `Connector`
-(id/description/health), `ConnectorRegistry`, демо `EchoConnector`,
-`/api/health` агрегирует статусы. Наследники добавляют конкретные интеграции.
+### Фаза 3. Инфраструктурный AppError — **done**
 
-### Фаза 5. Tailwind вместо SCSS — `style/main.css` + tailwind через
-cargo-leptos (версию сверить), обновить метаданные и доки.
+- [x] `src/error.rs`: `Config`/`NotFound`/`Internal`, `IntoResponse` (JSON без
+  деталей наружу), `From<ConfigError>`, юнит-тесты.
 
-### Фаза 6. UI-скелет — `<Layout>`: шапка (логотип, версия, меню),
-сайд-меню (адаптив, `use_media_query`), футер (copyright + версия); страницы:
-Главная, Личный кабинет (профиль-заглушка + «Подключения» из реестра),
-Статус сервисов, 404. thaw-ui (если совместим с leptos 0.8), leptos_use,
-leptos_fetch.
+### Фаза 4. Трейты коннекторов — **done**
 
-### Фаза 7. Воркспейс `core-shared` — корень → `[workspace]`,
-`crates/core-shared` (DTO: AppInfo, HealthResponse, ConnectorStatusDto);
-проверить cargo-leptos в воркспейсе.
+- [x] `src/connectors/`: трейт `Connector` (id/description/health),
+  `ConnectorRegistry`, демо `EchoConnector`, `GET /api/health` агрегирует статусы.
 
-### Фаза 8. CI-оптимизации — cargo-binstall вместо `cargo install cargo-leptos`;
-WASM-гейт в `test` (`cargo check --features hydrate --target wasm32`);
-эксперимент: chef cook для front-депов (`--target-dir target/front`).
+### Фаза 5. Tailwind вместо SCSS — **done**
 
-### Фаза 9. Версионирование + авто-changelog — формат `vX.Y.Z-<hash>`;
-`build.rs` (GIT_HASH env → git rev-parse → "dev", усечение до 7 символов);
-`src/version.rs`; версия в футере, `/api/health`, логе старта, теге образа;
-`cliff.toml` + CI-джоба `release` (git-cliff → CHANGELOG.md → GitHub Release
-по тегу `vX.Y.Z`); conventional commits обязательны (см. RULES.md §6).
+- [x] `style/main.css` (Tailwind v4, CSS-first: `@import "tailwindcss"`,
+  `@source "../src"`, `@theme`), `style/main.scss` удалён.
+- [x] `Cargo.toml`: `tailwind-input-file = "style/main.css"` вместо `style-file`;
+  результат — `target/site/pkg/base_template.css` (тот же href в `src/app.rs`).
 
-### Фаза 10. Устойчивый e2e — `BASE_URL` из env; тесты `/`, `/account`,
-`/status`, smoke `/api/health`; тайтл из env/константы.
+### Фаза 6. UI-скелет — **done**
 
-### Фаза 11. Документация — stack/architecture/development/asset-pipeline/
-current-state/README + `docs/versioning.md`.
+- [x] `<Layout>`: шапка (логотип, версия, меню), сайд-меню (адаптив,
+  `use_media_query`), футер (copyright + версия).
+- [x] Страницы: Главная, Личный кабинет (профиль-заглушка + «Подключения» из
+  реестра), Статус сервисов, 404.
+- [x] `leptos_use` подключён; `thaw-ui` **не используется**: 0.4.x требует
+  leptos 0.7 (несовместим с 0.8) — удалён из зависимостей.
 
-## Среднесрочные (после фаз)
+### Фаза 8. CI-оптимизации — **done**
 
-- [ ] cargo-audit в отдельной джобе.
-- [ ] compile-time конфиг (serde + include_str!).
-- [ ] CD: публикация образа в реестр (для наследников).
+- [x] cargo-binstall вместо `cargo install cargo-leptos` (CI и `deploy/Dockerfile`,
+  с откатом на `cargo install`).
+- [x] WASM-гейт в джобе `test`:
+  `cargo check --features hydrate --lib --target wasm32-unknown-unknown`.
+- [x] E2E в CI — только chromium; ожидание готовности сервера вместо `sleep`.
+- [x] Отдельная джоба `audit` (`cargo audit`).
+
+### Фаза 9. Версионирование + авто-changelog — **done**
+
+- [x] Формат `vX.Y.Z-<hash>`: `build.rs` (`GIT_HASH` env → `git rev-parse` →
+  `dev`), `src/version.rs`, версия в UI, `/api/health`, логе старта.
+- [x] `cliff.toml` + CI-джоба `release` по тегу `v*` (CHANGELOG.md → GitHub
+  Release), см. [versioning.md](versioning.md).
+
+### Фаза 10. Устойчивый e2e — **done**
+
+- [x] `BASE_URL` из env (`end2end/playwright.config.ts`), константы приложения в
+  `end2end/constants.ts` (имя приложения/заголовок переопределяются env).
+- [x] Тесты `/`, навигация `/account`/`/status`, 404, smoke `/api/health`
+  (+ `x-request-id`).
+
+### Фаза 11. Документация — **done**
+
+- [x] stack/architecture/configuration/development/deployment/asset-pipeline/
+  best-practices/current-state/roadmap/README + `docs/versioning.md` +
+  `docs/agents/`.
+
+## Осталось
+
+### Фаза 7. Воркспейс `core-shared` — **in_progress**
+
+- [ ] Корень → `[workspace]`, `crates/core-shared` (DTO: `AppInfo`,
+  `HealthResponse`, `ConnectorHealthDto`), перенос `src/dto.rs`.
+- [ ] Проверить `cargo-leptos` в воркспейсе (lib/bin пакеты, `[package.metadata.leptos]`).
+- [ ] Обновить docs (architecture, development) и CI-пути.
+
+### Технический долг текущей сессии — **planned**
+
+- [ ] Пересобрать `Cargo.lock` после удаления `thaw`/`leptos-fetch` и закоммитить
+  (`cargo build` / `cargo update`).
+- [ ] Прогнать локально `cargo fmt --all`, `cargo clippy --features ssr --all-targets -- -D warnings`,
+  `cargo test --features ssr`, `cargo check --features hydrate --target wasm32-unknown-unknown`
+  на машине с toolchain и подтвердить сборку (см. current-state.md → Open risks).
+
+## Среднесрочные
+
+- [x] cargo-audit в отдельной джобе.
+- [ ] Тег Docker-образа с версией (`vX.Y.Z-<hash>`) и публикация в реестр (CD).
+- [ ] Compile-time конфиг (serde + `include_str!`).
+- [ ] Миграция `serde_yaml` → `serde_yml`/`yaml-rust2`.
+- [ ] Отдельный `cargo chef cook` для WASM-зависимостей (`--target-dir target/front`).
+- [ ] Timeout/retry для клиентских запросов к API.
 
 ## Шаблон микросааса (наследник) — НЕ в этой базе
 

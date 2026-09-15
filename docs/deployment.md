@@ -15,7 +15,11 @@ run      (Alpine 3.20)   статический бинарник + site + config
 Ключевые решения:
 
 - **Конфигурация сборки — из проекта**: `[package.metadata.leptos]` в Cargo.toml
-  (site-root, style-file, assets-dir, фичи bin/lib) и `config/app.yaml`.
+  (site-root, `tailwind-input-file`, assets-dir, фичи bin/lib) и `config/app.yaml`.
+- **cargo-binstall**: `cargo-chef` и `cargo-leptos` ставятся готовыми бинарниками
+  (fallback — `cargo install`), это экономит десятки минут на холодном билде.
+- **Tailwind**: standalone-бинарник скачивает cargo-leptos на этапе сборки —
+  в образе рантайма ничего дополнительно не нужно.
 - **Сервер собирается под musl** (`LEPTOS_BIN_TARGET_TRIPLE=x86_64-unknown-linux-musl`,
   линковщик musl-gcc) → полностью статический бинарник, который запускается
   на Alpine без glibc.
@@ -45,25 +49,32 @@ docker compose -f deploy/docker-compose.yaml up --build
 Конвейер (порядок + параллельность):
 
 ```
-1. fmt ∥ clippy        — параллельно
+1. fmt ∥ clippy ∥ audit — параллельно
 2. fmt автокоммит      — push в main коммитит отформатированный код ([skip ci]);
                          на PR — ошибка, если код не отформатирован
-3. test                — юнит-тесты (после fmt+clippy)
+3. test (+ wasm gate)  — юнит-тесты и сборка клиента под wasm32 (после fmt+clippy)
 4. build-release       — musl-статик бинарник + WASM + CSS → артефакт `release`
 5. e2e ∥ docker        — параллельно, оба из артефакта:
-                         e2e    — Playwright против бинарника;
+                         e2e    — Playwright (chromium) против бинарника;
                          docker — образ из готового бинарника (Dockerfile.prebuilt)
-6. smoke               — отдельный стейдж: запуск контейнера + HTTP-проверка
+6. smoke               — отдельный стейдж: запуск контейнера + HTTP-проверки
+7. release             — только по тегу vX.Y.Z: CHANGELOG.md (git-cliff) + GitHub Release
 ```
 
 | Джоба | Что делает |
 |---|---|
 | `fmt` | `cargo fmt --all`; на push в main — автокоммит `style: cargo fmt [skip ci]` |
 | `clippy` | `cargo clippy --features ssr --all-targets -- -D warnings` |
-| `test` | `cargo test --features ssr --lib` |
+| `audit` | `cargo audit` (RustSec Advisory DB), независимая джоба |
+| `test` | `cargo test --features ssr --lib` + `cargo check --features hydrate --lib --target wasm32-unknown-unknown` |
 | `build-release` | `cargo-leptos build --release` (musl-сервер) + upload артефакта `dist/` |
-| `e2e` | Скачивает артефакт, стартует сервер, гоняет Playwright |
+| `e2e` | Скачивает артефакт, ждёт готовности `/api/health`, гоняет Playwright (`--project=chromium`, `BASE_URL`) |
 | `docker` | Собирает образ из артефакта (`deploy/Dockerfile.prebuilt`), сохраняет в артефакт |
-| `smoke` | Загружает образ, запускает контейнер, `curl` / grep заголовка |
+| `smoke` | Загружает образ, запускает контейнер, проверяет `/` и `/api/health` |
+| `release` | По тегу `v*`: генерирует `CHANGELOG.md` (git-cliff) и создаёт GitHub Release |
 
+Ожидание готовности сервисов реализовано циклом по `/api/health` (вместо
+фиксированного `sleep`), поэтому джобы устойчивы к разной скорости старта.
+
+Версионирование, теги и генерация CHANGELOG — [versioning.md](versioning.md).
 Публикация образов/деплой (CD) — план, см. [roadmap.md](roadmap.md).

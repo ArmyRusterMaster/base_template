@@ -97,43 +97,69 @@ fi
 # --- 4. НАСТРОЙКА КОМПОНЕНТОВ RUST & ЭКОСИСТЕМЫ LEPTOS ---
 echo "⚙️ Настройка компонентов Rust и утилит экосистемы..."
 
+# Хелпер установки инструментов: сначала cargo-binstall (готовый бинарник —
+# секунды вместо минут компиляции), при отсутствии/ошибке — обычный cargo install.
+install_tool() {
+    local bin="$1" crate="$2"
+    if command -v "$bin" &> /dev/null; then
+        echo "✅ $crate уже установлен."
+        return
+    fi
+    echo "📦 Установка $crate..."
+    if command -v cargo-binstall &> /dev/null; then
+        cargo binstall -y "$crate" || cargo install --locked "$crate"
+    else
+        cargo install --locked "$crate"
+    fi
+}
+
+# cargo-binstall — ускоритель установки Rust-инструментов (не критичен: при
+# ошибке уходим на cargo install).
+if ! command -v cargo-binstall &> /dev/null; then
+    echo "📦 Установка cargo-binstall..."
+    curl -L --proto '=https' --tlsv1.2 -sSf \
+        https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh \
+        | bash || echo "⚠️ cargo-binstall не установлен — используем cargo install."
+fi
+
 # 1. Установка WASM таргета
 echo "🦀 Добавление WASM таргета..."
 rustup target add wasm32-unknown-unknown
 
-# 2. Установка cargo-leptos для сборки и live-reload
-if ! command -v cargo-leptos &> /dev/null; then
-    echo "📦 Установка cargo-leptos..."
-    cargo install --locked cargo-leptos
-else
-    echo "✅ cargo-leptos уже установлен."
-fi
+# 2. Форматирование и линтинг (те же компоненты, что гоняет CI)
+rustup component add rustfmt clippy
 
-# 3. Установка форматировщика для макросов view!
-if ! command -v leptosfmt &> /dev/null; then
-    echo "📦 Установка leptosfmt..."
-    cargo install --locked leptosfmt
-else
-    echo "✅ leptosfmt already installed."
-fi
+# 3. Установка cargo-leptos для сборки и live-reload
+install_tool cargo-leptos cargo-leptos
 
-# 4. Установка утилит безопасности и аудита
-if ! command -v cargo-audit &> /dev/null; then
-    echo "📦 Установка cargo-audit..."
-    cargo install --locked cargo-audit
-else
-    echo "✅ cargo-audit уже установлен."
-fi
+# 4. Установка форматировщика для макросов view!
+install_tool leptosfmt leptosfmt
 
-# 5. SCCACHE НЕ ИСПОЛЬЗУЕТСЯ
+# 5. just — единая точка входа для типовых задач (см. justfile)
+install_tool just just
+
+# 6. Установка утилит безопасности и аудита
+install_tool cargo-audit cargo-audit
+
+# 7. git-cliff — локальная генерация CHANGELOG (в CI используется action)
+install_tool git-cliff git-cliff
+
+# 8. TAILWIND CSS ОТДЕЛЬНО НЕ СТАВИТСЯ
+# cargo-leptos сам скачивает standalone-бинарник Tailwind (версия задаётся
+# LEPTOS_TAILWIND_VERSION, по умолчанию v4.x) и собирает style/main.css →
+# target/site/pkg/base_template.css. Глобальная установка tailwind CLI не нужна
+# и вредна: версия может разойтись с той, что ожидает cargo-leptos.
+
+# 9. SCCACHE НЕ ИСПОЛЬЗУЕТСЯ
 # sccache сознательно не ставится: в этом проекте обёртка компилятора отключена
 # в .cargo/config.toml (rustc-wrapper = ""), т.к. sccache падает на Windows
 # при компиляции web-sys (слишком длинная командная строка rustc).
 
 # --- 5. УСТАНОВКА ЗАВИСИМОСТЕЙ ПРОЕКТА ---
-if [ -f "package.json" ]; then
-    echo "📦 Файл package.json найден. Синхронизируем node-зависимости (Tailwind и др.)..."
-    npm install
+if [ -f "end2end/package.json" ]; then
+    echo "📦 Установка npm-зависимостей e2e-тестов (Playwright)..."
+    (cd end2end && npm install)
 fi
 
 echo "✅ Окружение готово к инди-хакингу!"
+echo "👉 Дальше: just watch (dev-сервер) или just --list (все рецепты)."

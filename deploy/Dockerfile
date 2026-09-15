@@ -46,8 +46,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc
 
 # Утилиты Docker-сборки: chef (кеш зависимостей) и cargo-leptos (SSR+WASM+CSS).
-RUN cargo install cargo-chef --locked \
-    && cargo install cargo-leptos --locked
+# Ставим через cargo-binstall (готовые бинарники — минуты вместо десятков минут
+# компиляции), с откатом на обычный cargo install, если артефакта нет.
+RUN curl -L --proto '=https' --tlsv1.2 -sSf \
+        https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
+    && (cargo binstall -y cargo-chef cargo-leptos \
+        || (cargo install cargo-chef --locked && cargo install cargo-leptos --locked))
 
 WORKDIR /app
 

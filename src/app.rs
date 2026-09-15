@@ -1,9 +1,8 @@
 use leptos::prelude::*;
+use leptos::task::spawn_local;
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
-use leptos_router::{
-    components::{Route, Router, Routes, StaticSegment},
-    A,
-};
+use leptos_router::components::{A, Route, Router, Routes};
+use leptos_router::path;
 
 use crate::components::Layout;
 use crate::dto::HealthResponse;
@@ -38,9 +37,9 @@ pub fn App() -> impl IntoView {
         <Router>
             <Layout>
                 <Routes fallback=|| view! { <NotFound/> }>
-                    <Route path=StaticSegment("") view=HomePage/>
-                    <Route path=StaticSegment("account") view=AccountPage/>
-                    <Route path=StaticSegment("status") view=StatusPage/>
+                    <Route path=path!("") view=HomePage/>
+                    <Route path=path!("/account") view=AccountPage/>
+                    <Route path=path!("/status") view=StatusPage/>
                 </Routes>
             </Layout>
         </Router>
@@ -151,7 +150,7 @@ fn NotFound() -> impl IntoView {
             <p class="mt-4 text-lg text-gray-400">"Страница не найдена"</p>
             <A
                 href="/"
-                class="mt-6 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
+                attr:class="mt-6 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
             >
                 "На главную"
             </A>
@@ -172,7 +171,7 @@ fn ConnectorsList() -> impl IntoView {
     // Эффекты выполняются только на клиенте — SSR отдаёт заглушку.
     Effect::new(move |_| {
         refresh.track();
-        spawn(async move { health.set(fetch_health().await) });
+        spawn_local(async move { health.set(fetch_health().await) });
     });
 
     view! {

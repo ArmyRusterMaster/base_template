@@ -1,0 +1,44 @@
+# Конфигурация git-cliff (v2): CHANGELOG.md и заметки релиза строятся из
+# conventional commits (RULES.md §6). Файл CHANGELOG.md — генерируемый:
+# не редактировать вручную (см. docs/versioning.md).
+[changelog]
+header = """# Changelog
+
+Все значимые изменения проекта. Генерируется автоматически (`git-cliff`) из
+conventional commits — ручные правки будут перезаписаны.
+"""
+body = """
+{% if version %}## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}{% else %}## Unreleased{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}\
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}{% if commit.breaking %} (BREAKING){% endif %}
+{% endfor %}
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9]*"
+skip_tags = ""
+sort_commits = "oldest"
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Testing" },
+  { message = "^ci", group = "CI/CD" },
+  { message = "^build", group = "Build" },
+  { message = "^style", group = "Styling" },
+  { message = "^revert", group = "Revert" },
+  { message = "^chore", group = "Miscellaneous" },
+  { message = ".*", group = "Other" },
+]

@@ -48,7 +48,7 @@ pub fn Header(sidebar_open: RwSignal<bool>) -> impl IntoView {
                         />
                     </svg>
                 </button>
-                <A href="/" class="text-lg font-semibold text-gray-100">
+                <A href="/" attr:class="text-lg font-semibold text-gray-100">
                     "base_template"
                 </A>
                 <span class="hidden rounded-full border border-gray-700 px-2 py-0.5 text-xs text-gray-400 sm:inline">
@@ -56,13 +56,13 @@ pub fn Header(sidebar_open: RwSignal<bool>) -> impl IntoView {
                 </span>
             </div>
             <nav class="hidden items-center gap-4 text-sm md:flex">
-                <A href="/" class="text-gray-400 hover:text-gray-100">
+                <A href="/" attr:class="text-gray-400 hover:text-gray-100">
                     "Главная"
                 </A>
-                <A href="/status" class="text-gray-400 hover:text-gray-100">
+                <A href="/status" attr:class="text-gray-400 hover:text-gray-100">
                     "Статус"
                 </A>
-                <A href="/account" class="text-gray-400 hover:text-gray-100">
+                <A href="/account" attr:class="text-gray-400 hover:text-gray-100">
                     "Кабинет"
                 </A>
             </nav>
@@ -91,7 +91,7 @@ pub fn Sidebar(sidebar_open: RwSignal<bool>) -> impl IntoView {
 #[component]
 fn SidebarLink(href: &'static str, label: &'static str) -> impl IntoView {
     view! {
-        <A href=href class="rounded-lg px-3 py-2 text-gray-400 hover:bg-gray-800 hover:text-gray-100">
+        <A href=href attr:class="rounded-lg px-3 py-2 text-gray-400 hover:bg-gray-800 hover:text-gray-100">
             {label}
         </A>
     }
