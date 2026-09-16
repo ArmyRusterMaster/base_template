@@ -46,6 +46,14 @@ docker compose -f deploy/docker-compose.yaml up --build
 
 ## CI/CD (`.github/workflows/ci.yaml`)
 
+E2E временно закреплён на `ubuntu-22.04`: Playwright 1.44.1 из
+`end2end/package-lock.json` использует зависимости Jammy (`libasound2`),
+несовместимые с установкой на Noble (Ubuntu 24.04, `libasound2t64`).
+`npm ci` и `playwright install --with-deps chromium` сохраняются.
+Перед переходом e2e на Ubuntu 24.04 нужно обновить Playwright вместе с браузером.
+Это мера совместимости, не обновление безопасности устаревшего браузера;
+исправление ожидает повторного CI.
+
 Конвейер (порядок + параллельность):
 
 `ci.yaml` — только оркестратор (`needs`, условия, права). Каждая джоба вынесена

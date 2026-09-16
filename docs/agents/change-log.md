@@ -12,6 +12,18 @@
 - Risks:
 ```
 
+## 2026-09-17 — Совместимость e2e runner с Playwright 1.44.1
+
+- Changed: `.github/workflows/e2e.yaml` — Ubuntu 22.04 вместо ubuntu-latest.
+- Why: установка браузера падала на Ubuntu 24.04 до тестов: у libasound2
+  нет installation candidate. Версия из lockfile поддерживает Ubuntu 22.04.
+- Tests: разобран лог CI и таблица nativeDeps Playwright v1.44.1;
+  локальные тесты, установка браузера и проверки workflow не запускались.
+- Docs: deployment, current-task.
+- Risks: временное закрепление ОС; обновление Playwright/Chromium отложено.
+  Требуется повторный CI, успешные e2e пока не подтверждены.
+
+
 ## 2026-09-17 — WASM release: query-depth overflow
 
 - Changed: `src/lib.rs` — `recursion_limit = "256"` по рекомендации rustc;

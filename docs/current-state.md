@@ -83,6 +83,11 @@ CI/GHCR ждут удалённой проверки. Следующие зад�
 
 ## Open risks
 
+- **E2E, 2026-09-17:** установка Chromium через Playwright 1.44.1 упала на
+  Ubuntu 24.04 (`libasound2` без installation candidate). E2E runner временно
+  закреплён на Ubuntu 22.04; результат исправления ожидается в CI. Обновление
+  Playwright и браузера остаётся отдельной задачей.
+
 - **2026-09-17, лог CI владельца:** WASM release упал с
   `queries overflow the depth limit` при вычислении layout `hydrate_async`.
   Серверная musl-сборка завершилась успешно. В `src/lib.rs` лимит компилятора

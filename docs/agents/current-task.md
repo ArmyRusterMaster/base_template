@@ -37,6 +37,11 @@
 
 ## In progress
 
+- E2E (2026-09-17): установка браузера Playwright 1.44.1 падает на Ubuntu
+  24.04 из-за libasound2. Только e2e runner переведён на ubuntu-22.04;
+  исправление ожидает CI. Локально браузеры/тесты/workflow не запускались.
+  Следующий шаг: повтор CI, затем отдельное обновление Playwright/Chromium.
+
 - Приоритет: исправление падения WASM release из лога CI владельца
   (2026-09-17): `queries overflow the depth limit` в `hydrate_async`.
   В `src/lib.rs` добавлен `recursion_limit = "256"`; из `Cargo.toml` убран
