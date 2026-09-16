@@ -4,6 +4,7 @@
 .git
 .cargo
 target
+.kilo
 node_modules
 end2end/node_modules
 end2end/test-results

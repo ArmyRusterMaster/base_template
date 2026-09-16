@@ -74,8 +74,10 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Clippy
+      - name: Clippy (base_template)
         run: cargo clippy --features ssr --all-targets -- -D warnings
+      - name: Clippy (core-shared)
+        run: cargo clippy -p core-shared --all-targets -- -D warnings
 
   # 2. Юнит-тесты + WASM-гейт --------------------------------------------------
   test:
@@ -88,8 +90,11 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - name: Unit tests
+      - name: Unit tests (base_template)
         run: cargo test --features ssr --lib
+      # Крейт воркспейса тестируется отдельно: у него нет фич ssr/hydrate.
+      - name: Unit tests (core-shared)
+        run: cargo test -p core-shared
       # Клиентская часть (hydrate) собирается только под wasm32: проверяем здесь,
       # чтобы ошибки фронтенда не всплывали уже на релизной сборке.
       - name: WASM gate (hydrate)

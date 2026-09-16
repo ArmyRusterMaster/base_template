@@ -37,10 +37,12 @@ fmt-check:
 # Линтер строго, как в CI.
 lint:
 	cargo clippy --features ssr --all-targets -- -D warnings
+	cargo clippy -p core-shared --all-targets -- -D warnings
 
 # Юнит-тесты + гейт компиляции клиента под wasm32.
 test:
 	cargo test --features ssr --lib
+	cargo test -p core-shared
 	cargo check --features hydrate --lib --target wasm32-unknown-unknown
 
 # Rustdoc без зависимостей.

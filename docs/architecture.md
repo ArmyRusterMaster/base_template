@@ -8,6 +8,8 @@
 ├── cliff.toml             # конфигурация git-cliff (CHANGELOG/релизы) — см. versioning.md
 ├── justfile               # типовые задачи разработки
 ├── config/app.yaml        # конфигурация приложения (yaml)
+├── crates/
+│   └── core-shared/       # DTO, общие для клиента и сервера (крейт воркспейса)
 ├── deploy/
 │   ├── Dockerfile         # мультистейдж-сборка (Ubuntu → Alpine)
 │   ├── Dockerfile.prebuilt# рантайм-образ из готового артефакта (CI)
@@ -22,7 +24,6 @@
 │   ├── app.rs             # shell, App, маршруты и страницы (Leptos-компоненты)
 │   ├── components.rs      # UI-скелет: Layout, Header, Sidebar, Footer
 │   ├── config.rs          # типизированная конфигурация (yaml + APP_*)
-│   ├── dto.rs             # DTO, общие для клиента и сервера (план: crates/core-shared)
 │   ├── error.rs           # AppError + IntoResponse (feature `ssr`)
 │   ├── logging.rs         # инициализация tracing (feature `ssr`)
 │   ├── version.rs         # версия vX.Y.Z-<hash> (GIT_HASH из build.rs)
@@ -38,12 +39,30 @@
 | Наблюдаемость | `logging.rs`, `version.rs` | `tracing`-подписчик, версия сборки `vX.Y.Z-<hash>` |
 | Ошибки | `error.rs` | единый `AppError` для handler-ов axum; наружу — только безопасный JSON |
 | Интеграции | `connectors/mod.rs` | контракт `Connector` + реестр; конкретные интеграции — в наследниках |
-| Общие типы | `dto.rs` | DTO запросов/ответов, используемые и SSR, и hydrate |
+| Общие типы | `crates/core-shared` | DTO для SSR и hydrate; крейт без leptos/axum/tokio |
 | UI | `app.rs`, `components.rs` | shell, маршруты, страницы, layout |
 | Стили | `style/main.css` | Tailwind v4 (CSS-first), собирается cargo-leptos |
 
 Модули, помеченные в `lib.rs` как `#[cfg(feature = "ssr")]`, не компилируются в
 клиентский бандл (WASM).
+
+## Воркспейс
+
+Корневой `Cargo.toml` — одновременно манифест приложения и воркспейса:
+`[workspace] members = ["crates/core-shared"]`, `resolver = "2"`.
+
+- Секция `[package.metadata.leptos]` задана **только в корневом пакете**, чтобы
+  cargo-leptos видел ровно один проект (bin/lib = `base_template`). Добавлять
+  `[[workspace.metadata.leptos]]` не нужно: при двух определениях cargo-leptos
+  потребует явно выбирать проект через `--project`.
+- `crates/core-shared` — обычный библиотечный крейт (только `serde`), поэтому
+  собирается и под `wasm32-unknown-unknown`, и под нативную цель. Зависимости от
+  `leptos`, `axum`, `tokio` там запрещены.
+- Команды с фичами выполняются из корня и применяются к пакету приложения
+  (`cargo test --features ssr --lib`, `cargo check --features hydrate ...`);
+  для общего крейта используются явные вызовы `cargo test -p core-shared`,
+  `cargo clippy -p core-shared`.
+- `Cargo.lock` — один на воркспейс.
 
 
 ## Потоки исполнения

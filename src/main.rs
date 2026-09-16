@@ -1,14 +1,47 @@
-// AppState и health-обработчик существуют только на сервере (feature `ssr`);
-// для hydrate-сборки бин не компилируется.
+//! Бинарник SSR-сервера (axum).
+//!
+//! Вся серверная часть компилируется только с feature `ssr`; без неё `main`
+//! остаётся заглушкой, а гидратация запускается из `lib.rs::hydrate()`.
+
+#[cfg(feature = "ssr")]
+use std::sync::Arc;
+
+#[cfg(feature = "ssr")]
+use axum::extract::{FromRef, State};
+#[cfg(feature = "ssr")]
+use axum::routing::get;
+#[cfg(feature = "ssr")]
+use axum::{Json, Router};
+#[cfg(feature = "ssr")]
+use base_template::app::{shell, App};
+#[cfg(feature = "ssr")]
+use base_template::config::AppConfig;
+#[cfg(feature = "ssr")]
+use base_template::connectors::{ConnectorRegistry, ConnectorStatus};
+#[cfg(feature = "ssr")]
+use base_template::version::version;
+#[cfg(feature = "ssr")]
+use core_shared::{ConnectorHealthDto, HealthResponse};
+#[cfg(feature = "ssr")]
+use leptos::prelude::*;
+#[cfg(feature = "ssr")]
+use leptos_axum::{generate_route_list, LeptosRoutes};
+#[cfg(feature = "ssr")]
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+
+/// Состояние приложения: опции Leptos + реестр коннекторов.
 #[cfg(feature = "ssr")]
 #[derive(Clone)]
 struct AppState {
-    leptos_options: leptos::prelude::LeptosOptions,
-    connectors: std::sync::Arc<base_template::connectors::ConnectorRegistry>,
+    leptos_options: LeptosOptions,
+    connectors: Arc<ConnectorRegistry>,
 }
 
+// `LeptosRoutes` и `file_and_error_handler` из leptos_axum требуют, чтобы
+// `LeptosOptions: FromRef<S>` для состояния роутера: так SSR-хендлеры получают
+// опции Leptos из `AppState`.
 #[cfg(feature = "ssr")]
-impl axum::extract::FromRef<AppState> for leptos::prelude::LeptosOptions {
+impl FromRef<AppState> for LeptosOptions {
     fn from_ref(state: &AppState) -> Self {
         state.leptos_options.clone()
     }
@@ -17,20 +50,6 @@ impl axum::extract::FromRef<AppState> for leptos::prelude::LeptosOptions {
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
-    use std::sync::Arc;
-
-    use axum::extract::State;
-    use axum::routing::get;
-    use axum::{Json, Router};
-    use base_template::app::shell;
-    use base_template::config::AppConfig;
-    use base_template::connectors::{ConnectorRegistry, ConnectorStatus};
-    use base_template::dto::{ConnectorHealthDto, HealthResponse};
-    use base_template::version::version;
-    use leptos::prelude::*;
-    use leptos_axum::{generate_route_list, LeptosRoutes};
-    use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
-
     // Конфигурация (fail-fast) и логирование — первыми.
     let settings = AppConfig::load().unwrap_or_else(|err| {
         eprintln!("❌ Невалидная конфигурация: {err}");
@@ -51,23 +70,28 @@ async fn main() {
     // Маршруты, зарегистрированные в компоненте App (роутер Leptos).
     let routes = generate_route_list(App);
 
+    let state = AppState {
+        leptos_options,
+        connectors: Arc::new(ConnectorRegistry::with_defaults()),
+    };
+
+    // `leptos_routes` принимает ссылку на состояние целиком (`&S`), а не на
+    // `LeptosOptions` — опции при этом извлекаются через `FromRef<AppState>`.
+    let shell_options = state.leptos_options.clone();
+
     let app = Router::new()
         // Инфраструктурный health-эндпоинт (статус + коннекторы).
         .route("/api/health", get(health_handler))
         // SSR: на каждый маршрут отдаём `shell` (HTML-каркас + hydration-скрипты).
-        .leptos_routes(&leptos_options, routes, {
-            let leptos_options = leptos_options.clone();
-            move || shell(leptos_options.clone())
-        })
+        .leptos_routes(&state, routes, move || shell(shell_options.clone()))
         // Статика из site-root (JS/WASM/CSS) и 404 → shell.
-        .fallback(leptos_axum::file_and_error_handler(shell))
+        // Тип состояния указан явно: иначе вывод `S` неоднозначен
+        // (FromRef<AppState> и рефлексивный FromRef<LeptosOptions>).
+        .fallback(leptos_axum::file_and_error_handler::<AppState, _>(shell))
         // request-id: на каждый запрос ставится x-request-id и возвращается в ответе.
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
-        .with_state(AppState {
-            leptos_options,
-            connectors: Arc::new(ConnectorRegistry::with_defaults()),
-        });
+        .with_state(state);
 
     tracing::info!(
         "{} v{} слушает http://{}",

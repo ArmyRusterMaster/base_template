@@ -6,6 +6,13 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# Воркспейс: приложение (этот пакет) + крейты с общими типами.
+# resolver задан явно (edition 2021 подразумевает "2") — чтобы поведение резолва
+# фич не менялось незаметно при будущих правках манифестов.
+[workspace]
+members = ["crates/core-shared"]
+resolver = "2"
+
 [dependencies]
 leptos = { version = "0.8.0" }
 leptos_router = { version = "0.8.0" }
@@ -17,6 +24,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "signal", "macros"], opt
 wasm-bindgen = { version = "0.2.106", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
+# Общие DTO (клиент + сервер) — отдельный крейт воркспейса.
+core-shared = { path = "crates/core-shared" }
 # leptos-use 0.19.x совместим с leptos 0.8 (см. docs/stack.md).
 leptos-use = "0.19.2"
 # thaw-ui (0.4.x) требует leptos 0.7 и с 0.8 несовместим — не используется.

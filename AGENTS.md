@@ -35,8 +35,8 @@ hydration) + Axum 0.8**. Бизнес-логики нет: это каркас, 
 | Ошибки | `src/error.rs` |
 | Логирование | `src/logging.rs` |
 | Версия сборки | `build.rs` → `src/version.rs` |
-| Общие DTO | `src/dto.rs` (план: `crates/core-shared` в воркспейсе) |
-| Тесты | юнит — в модулях (`#[cfg(test)]`); e2e — `end2end/` |
+| Общие DTO | `crates/core-shared` (крейт воркспейса) |
+| Тесты | юнит — в модулях (`#[cfg(test)]`) и `crates/core-shared`; e2e — `end2end/` |
 | CI | `.github/workflows/ci.yaml` |
 | Задачи разработчика | `justfile` |
 | Релизы/CHANGELOG | `cliff.toml`, [docs/versioning.md](docs/versioning.md) |
@@ -56,7 +56,9 @@ just e2e           # Playwright (нужен запущенный сервер)
 ```bash
 cargo fmt --all
 cargo clippy --features ssr --all-targets -- -D warnings
+cargo clippy -p core-shared --all-targets -- -D warnings
 cargo test --features ssr
+cargo test -p core-shared
 cargo check --features hydrate --lib --target wasm32-unknown-unknown
 cargo audit
 ```
@@ -75,3 +77,6 @@ cargo audit
 - Windows: `npm`/`npx` вызывать как `npm.cmd`/`npx.cmd`; sccache отключён
   (`.cargo/config.toml`, `rustc-wrapper = ""`).
 - `CHANGELOG.md` — генерируемый файл, руками не править.
+- Общие типы (клиент + сервер) живут **только** в `crates/core-shared`: DTO в
+  `src/` дублировать нельзя, а крейт не должен зависеть от `leptos`/`axum`/`tokio`
+  (иначе сломается сборка под `wasm32`).

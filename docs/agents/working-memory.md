@@ -18,8 +18,12 @@
   из UI-кода напрямую.
 - **Версия сборки** — единственный источник `src/version::version()`
   (`vX.Y.Z-<hash>` из `build.rs`); не хардкодить версию в UI/API.
-- **DTO** живут в `src/dto.rs` и используются обеими сторонами (план — вынести в
-  `crates/core-shared`).
+- **DTO — только в `crates/core-shared`**: тип, нужный и серверу, и клиенту,
+  живёт в крейте воркспейса (без зависимостей от `leptos`/`axum`/`tokio`), а не
+  дублируется в `src/`. Публичный путь — `core_shared::<Type>`.
+- **Воркспейс**: `[workspace] members = ["crates/core-shared"]` в корневом
+  манифесте; `[package.metadata.leptos]` — только в корневом пакете (второе
+  определение `[[workspace.metadata.leptos]]` сломало бы `cargo-leptos`).
 
 ## Соглашения
 
@@ -33,8 +37,8 @@
 ## Команды проверки
 
 ```bash
-just precommit        # fmt + clippy + tests + rustdoc
-just test             # cargo test --features ssr + wasm-гейт
+just precommit        # fmt + clippy (app + core-shared) + tests + rustdoc
+just test             # cargo test --features ssr + cargo test -p core-shared + wasm-гейт
 just e2e              # Playwright против локального сервера
 cargo audit           # уязвимости зависимостей
 ```

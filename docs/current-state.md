@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-Обновляется при изменениях. Последняя проверка: **15.09.2026**.
+Обновляется при изменениях. Последняя проверка: **16.09.2026**.
 
 Разделы соответствуют правилам для агентов (см. также
 [docs/agents/](agents/)).
@@ -17,6 +17,9 @@
   middleware request-id (`tower-http`) в `src/main.rs`.
 - **Инфраструктурный AppError** — `src/error.rs`: `Config`/`NotFound`/`Internal`,
   `IntoResponse` (JSON без внутренних деталей), `From<ConfigError>`, тесты.
+- **Воркспейс `crates/core-shared`** — DTO, общие для SSR и WASM
+  (`HealthResponse`, `ConnectorHealthDto`), только `serde`; `src/dto.rs` удалён;
+  тесты контракта JSON. См. [architecture.md](architecture.md) → «Воркспейс».
 - **Коннекторы** — `src/connectors/mod.rs`: трейт `Connector`, `ConnectorRegistry`,
   демо `EchoConnector`; `GET /api/health` агрегирует статусы.
 - **UI-скелет** — `src/components.rs` (Layout: шапка с версией, сайд-меню с
@@ -41,24 +44,25 @@
 
 ## In progress
 
-- **Фаза 7 roadmap**: воркспейс `crates/core-shared` для общих DTO — пока DTO
-  живут в `src/dto.rs`.
+Активной задачи нет. Текущий статус и следующий шаг — в
+[agents/current-task.md](agents/current-task.md), историческое состояние — в
+[agents/change-log.md](agents/change-log.md).
 
 ## Planned
 
-- см. [roadmap.md](roadmap.md): воркспейс `core-shared`, compile-time конфиг,
-  CD (публикация образа), тег Docker-образа с версией, миграция `serde_yaml`.
+- см. [roadmap.md](roadmap.md): compile-time конфиг, CD (публикация образа),
+  тег Docker-образа с версией, миграция `serde_yaml`, timeout/retry для
+  клиентских запросов.
 
 ## Known limitations
 
-- **Локальная компиляция в этой сессии не запускалась**: на рабочей машине нет
-  доступного Rust-toolchain (`.cargo`/`.rustup` принадлежат другому пользователю
-  Windows, `cargo`/`rustup` отсутствуют в `PATH`). Правки проверялись чтением
-  кода против фактических API `leptos 0.8.20` / `leptos_router 0.8.15`, а также
-  валидацией конфигов и TypeScript. Фактическая сборка проверяется в CI.
-- `Cargo.lock` не пересобран после удаления `thaw`/`leptos-fetch` (зависимости
-  больше не используются и выпадут из lock при первой сборке). Рекомендуется
-  выполнить `cargo build` (любой) и закоммитить обновлённый lock.
+- **Полная сборка бинарника и `cargo-leptos build` в этой сессии не запускались**:
+  компиляция подтверждена `cargo check/clippy/test/doc` (см. Last verified), но
+  связка cargo-leptos + Tailwind + wasm-pack (`just build`) не прогонялась.
+- **Совместимость cargo-leptos с воркспейсом** подтверждена на уровне
+  `cargo metadata`/check: `[package.metadata.leptos]` в корневом пакете даёт
+  единственный проект; полный `cargo leptos build` проверяется в CI
+  (джоба `build-release`).
 - **Tailwind** требует сети на этапе сборки (cargo-leptos скачивает бинарник).
 - **Docker локально не проверен** (нет Docker CLI) — сборка образа проверяется
   в CI (джоба `docker`).
@@ -87,10 +91,17 @@
 
 ## Last verified
 
-- **15.09.2026**: `end2end` — `npm install` + `npx tsc --noEmit` → успешно (exit 0).
-- **15.09.2026**: `.github/workflows/ci.yaml` разобран как YAML (9 джоб),
-  `cliff.toml` и `Cargo.toml` — как TOML; структура джоб проверена.
-- **08.09.2026** (прошлая сессия): `cargo check` падал с ошибками компиляции
-  (импорты `leptos_router`, `spawn`, `class` у `<A>`); они исправлены,
-  повторный `cargo check` не выполнялся (нет toolchain) — см.
-  [agents/change-log.md](agents/change-log.md).
+- **16.09.2026**: локальный toolchain-прогон (Windows, stable MSVC, wasm-таргет
+  добавлен): `cargo fmt --all -- --check` → ok; `cargo check --features ssr` →
+  exit 0; `cargo clippy --features ssr --all-targets -- -D warnings` → ok (только
+  шум LNK4044 от глобального конфига линкера пользователя и future-incompat
+  заметка о зависимости `proc-macro-error2`); `cargo test --features ssr` →
+  10 passed / 0 failed (включая тесты `core-shared`); `cargo test -p core-shared`
+  → 3 passed / 0 failed; wasm-гейт `cargo check --features hydrate --lib --target
+  wasm32-unknown-unknown` → ok; `cargo doc --workspace --no-deps` → ok;
+  `Cargo.lock` пересобран. Фикс вывода типов в `src/main.rs`:
+  `file_and_error_handler::<AppState, _>` (иначе `S` неоднозначен из-за
+  рефлексивного `FromRef` impl axum).
+- **16.09.2026**: Фаза 7 — создан `crates/core-shared` (воркспейс), DTO перенесены,
+  `src/dto.rs` удалён; CI/just/docs обновлены.
+- **16.09.2026**: `end2end` — `npm install` + `npx tsc --noEmit` → успешно (exit 0).

@@ -64,11 +64,17 @@ just precommit                  # быстрый полный прогон
 # эквивалент вручную:
 cargo fmt --all
 cargo clippy --features ssr --all-targets -- -D warnings
+cargo clippy -p core-shared --all-targets -- -D warnings      # крейт воркспейса
 cargo test --features ssr
+cargo test -p core-shared
 cargo check --features hydrate --lib --target wasm32-unknown-unknown   # WASM-гейт
 cargo doc --features ssr --no-deps
 cargo audit
 ```
+
+Команды с фичами выполняются из корня и относятся к пакету приложения; крейт
+общих типов тестируется/линтится явно через `-p core-shared` (см.
+[architecture.md](architecture.md) → «Воркспейс»).
 
 CI гоняет то же самое плюс e2e, Docker и smoke — см. [deployment.md](deployment.md).
 

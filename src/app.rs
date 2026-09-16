@@ -1,11 +1,11 @@
+use core_shared::HealthResponse;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
-use leptos_router::components::{A, Route, Router, Routes};
+use leptos_router::components::{Route, Router, Routes, A};
 use leptos_router::path;
 
 use crate::components::Layout;
-use crate::dto::HealthResponse;
 use crate::version::version;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {

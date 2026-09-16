@@ -13,6 +13,8 @@ pub fn init(level: &str) {
     let filter = EnvFilter::try_new(&filter).unwrap_or_else(|_| EnvFilter::new("info"));
 
     // try_init: безопасно при повторном вызове (например, в тестах).
-    let _ = tracing_subscriber::fmt().with_env_filter(filter.clone()).try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter.clone())
+        .try_init();
     tracing::debug!("Логирование инициализировано (уровень: {filter})");
 }

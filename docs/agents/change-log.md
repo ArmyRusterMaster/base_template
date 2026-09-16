@@ -12,7 +12,33 @@
 - Risks:
 ```
 
-## 15.09.2026 — Компилируемость + фазы 1, 5, 8, 9, 10, 11
+## 16.09.2026 — Фаза 7: воркспейс `crates/core-shared`
+
+- **Changed:** корневой манифест стал воркспейсом
+  (`[workspace] members = ["crates/core-shared"]`, `resolver = "2"`); создан крейт
+  `crates/core-shared` (только `serde`): `HealthResponse`, `ConnectorHealthDto` +
+  тесты JSON-контракта; `src/dto.rs` удалён, приложение использует
+  `core_shared::*`; в CI/just добавлены `cargo test -p core-shared` и
+  `cargo clippy -p core-shared`; в `.dockerignore` добавлен `.kilo` (вложенные
+  worktrees не должны попадать в контекст сборки).
+- **Why:** общие типы не должны дублироваться между SSR и WASM (RULES.md §5);
+  крейт без leptos/axum/tokio гарантирует сборку под wasm32.
+- **Files:** `Cargo.toml`, `crates/core-shared/**` (new), `src/lib.rs`,
+  `src/app.rs`, `src/main.rs`, `src/dto.rs` (удалён),
+  `.github/workflows/ci.yaml`, `justfile`, `.dockerignore`, `AGENTS.md`, `docs/**`.
+- **Tests:** локальный toolchain-прогон 16.09.2026: `cargo fmt --all -- --check` ok,
+  `cargo check --features ssr` ok, `cargo clippy --features ssr --all-targets --
+  -D warnings` ok, `cargo test --features ssr` → 10 passed, `cargo test -p
+  core-shared` → 3 passed, wasm-гейт `cargo check --features hydrate --lib
+  --target wasm32-unknown-unknown` ok, `cargo doc --workspace --no-deps` ok.
+  Для wasm-гейта потребовался `rustup target add wasm32-unknown-unknown`.
+- **Docs:** architecture (+ раздел «Воркспейс»), stack, development, roadmap
+  (Фаза 7 → done), current-state, AGENTS, docs/agents/*.
+- **Risks:** совместимость `cargo-leptos` с воркспейсом подтверждается только в
+  CI; `Cargo.lock` требует пересборки (добавлен path-крейт). `AppInfo` намеренно
+  не создавали — нет потребителя.
+
+## 16.09.2026 — Компилируемость + фазы 1, 5, 8, 9, 10, 11
 
 - **Changed:** исправлены ошибки компиляции под leptos 0.8
   (`A` из `leptos_router::components`, `path!` вместо `StaticSegment`,
@@ -47,4 +73,4 @@
 - **Tests:** `cargo check` → 7 ошибок (импорты leptos_router, `spawn`, `class`
   у `<A>`).
 - **Docs:** ошибки перенесены в `docs/current-state.md` → Known limitations.
-- **Risks:** компиляция оставалась сломанной до сессии 15.09.2026.
+- **Risks:** компиляция оставалась сломанной до сессии 16.09.2026.

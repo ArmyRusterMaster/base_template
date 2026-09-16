@@ -7,7 +7,7 @@
 Статусы: `done` | `in_progress` | `planned`. Обновляется вместе с
 [current-state.md](current-state.md).
 
-## Сделано (фазы 1–6, 8–11)
+## Сделано (фазы 1–11)
 
 ### Фаза 1. just + setup.sh — **done**
 
@@ -52,6 +52,22 @@
 - [x] `leptos_use` подключён; `thaw-ui` **не используется**: 0.4.x требует
   leptos 0.7 (несовместим с 0.8) — удалён из зависимостей.
 
+### Фаза 7. Воркспейс `core-shared` — **done**
+
+- [x] Корень → `[workspace] members = ["crates/core-shared"]`, `resolver = "2"`.
+- [x] `crates/core-shared` — DTO, общие для SSR и WASM (`HealthResponse`,
+  `ConnectorHealthDto`), только `serde` (без leptos/axum/tokio), юнит-тесты
+  контракта JSON.
+- [x] `src/dto.rs` удалён, приложение импортирует `core_shared::*`.
+- [x] CI/just: `cargo test -p core-shared`, `cargo clippy -p core-shared ...`.
+- [x] Docs обновлены (architecture + раздел «Воркспейс», development, AGENTS).
+- [ ] Решение: `AppInfo` **не создавали** — в шаблоне нет потребителя, тип не
+  должен появляться «на будущее» (добавляется в наследниках вместе с запросом).
+- [x] Сборка подтверждена локально (16.09.2026): воркспейс-метадата корректна,
+  `cargo check/test/clippy/doc` и wasm-гейт зелёные. Полный `cargo leptos build`
+  (Tailwind + wasm-pack) проверяется в CI (джоба `build-release`);
+  `[[workspace.metadata.leptos]]` намеренно не добавлен.
+
 ### Фаза 8. CI-оптимизации — **done**
 
 - [x] cargo-binstall вместо `cargo install cargo-leptos` (CI и `deploy/Dockerfile`,
@@ -83,20 +99,16 @@
 
 ## Осталось
 
-### Фаза 7. Воркспейс `core-shared` — **in_progress**
+### Технический долг — **done (16.09.2026)**
 
-- [ ] Корень → `[workspace]`, `crates/core-shared` (DTO: `AppInfo`,
-  `HealthResponse`, `ConnectorHealthDto`), перенос `src/dto.rs`.
-- [ ] Проверить `cargo-leptos` в воркспейсе (lib/bin пакеты, `[package.metadata.leptos]`).
-- [ ] Обновить docs (architecture, development) и CI-пути.
-
-### Технический долг текущей сессии — **planned**
-
-- [ ] Пересобрать `Cargo.lock` после удаления `thaw`/`leptos-fetch` и закоммитить
-  (`cargo build` / `cargo update`).
-- [ ] Прогнать локально `cargo fmt --all`, `cargo clippy --features ssr --all-targets -- -D warnings`,
-  `cargo test --features ssr`, `cargo check --features hydrate --target wasm32-unknown-unknown`
-  на машине с toolchain и подтвердить сборку (см. current-state.md → Open risks).
+- [x] `Cargo.lock` пересобран и актуален (удалены `thaw`/`leptos-fetch`, добавлен
+  path-крейт `core-shared`) — обновлён при сборках и включён в рабочий diff.
+- [x] Локальный прогон полного набора проверок на машине с toolchain (см.
+  current-state.md → Last verified): `cargo fmt --all -- --check`,
+  `cargo check --features ssr`, `cargo clippy --features ssr --all-targets -- -D warnings`,
+  `cargo test --features ssr` (10 passed), `cargo test -p core-shared` (3 passed),
+  wasm-гейт `cargo check --features hydrate --lib --target wasm32-unknown-unknown`,
+  `cargo doc --workspace --no-deps`. Всё зелёное.
 
 ## Среднесрочные
 

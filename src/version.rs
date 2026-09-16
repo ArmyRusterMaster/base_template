@@ -14,7 +14,10 @@ mod tests {
 
     #[test]
     fn version_format_is_v_semver_hash() {
-        assert!(VERSION.starts_with('v'), "версия начинается с 'v': {VERSION}");
+        assert!(
+            VERSION.starts_with('v'),
+            "версия начинается с 'v': {VERSION}"
+        );
         assert!(VERSION.contains('-'), "версия содержит хеш: {VERSION}");
         assert!(!VERSION.ends_with('-'), "хеш не пустой: {VERSION}");
     }

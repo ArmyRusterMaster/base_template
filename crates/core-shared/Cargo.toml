@@ -1,0 +1,12 @@
+[package]
+name = "core-shared"
+version = "0.1.0"
+edition = "2021"
+description = "DTO, общие для SSR-сервера и WASM-клиента (base_template)"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
