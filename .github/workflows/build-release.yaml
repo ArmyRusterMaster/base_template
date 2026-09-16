@@ -1,0 +1,64 @@
+# Релиз-сборка + артефакт (переиспользуемый workflow).
+#
+# Сервер — musl-статик (запускается и на ubuntu, и в alpine-образе), клиент —
+# wasm. Конфигурация сборки — из [package.metadata.leptos] в Cargo.toml.
+name: build-release
+
+on:
+  workflow_call: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-release:
+    name: build (release)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - name: Install native build tools and musl linker
+        run: sudo apt-get update && sudo apt-get install -y build-essential musl-tools lld
+      # cargo-binstall: тянет готовый бинарник cargo-leptos (минуты компиляции
+      # вместо десятков минут). Fallback — обычный cargo install.
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-leptos
+        run: cargo binstall -y cargo-leptos || cargo install cargo-leptos --locked
+      - name: Build (release)
+        env:
+          LEPTOS_BIN_TARGET_TRIPLE: x86_64-unknown-linux-musl
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          # Target-specific: не передавать ELF linker flags в WASM и host build scripts.
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+          CC_x86_64_unknown_linux_musl: musl-gcc
+        run: cargo-leptos build --release
+
+      # Собираем артефакт: бинарник + статика + конфиг
+      - name: Assemble dist
+        run: |
+          mkdir -p dist
+          cp target/x86_64-unknown-linux-musl/release/base_template dist/
+          cp -r target/site dist/site
+          cp -r config dist/config
+      # Проверка полной связки: Tailwind реально собрал CSS (утилита из view!),
+      # wasm-бандл на месте, musl-бинарник существует. Без этого шага молчаливая
+      # деградация Tailwind/wasm-pipeline всплывала бы только в e2e/smoke.
+      - name: Verify build artifacts
+        run: |
+          test -f target/site/pkg/base_template.css
+          grep -q "rounded-xl" target/site/pkg/base_template.css
+          test -n "$(find target/site/pkg -name '*.wasm' -print -quit)"
+          test -f target/x86_64-unknown-linux-musl/release/base_template
+          echo "✅ Полная связка билда подтверждена (CSS + WASM + musl-бинарник)"
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: dist
+          retention-days: 3

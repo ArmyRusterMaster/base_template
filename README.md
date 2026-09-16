@@ -26,18 +26,22 @@ e2e-тесты на Playwright.
 - **Asset pipeline**: cache-busting (хэши в именах бандлов) из коробки.
 - **CI/CD** (`.github/workflows/ci.yaml`): fmt (автокоммит) ∥ clippy ∥ audit →
   tests (+ wasm-гейт) → build-release → e2e ∥ docker → smoke → релиз по тегу.
-- **justfile**: `just watch/build/serve/lint/test/doc/audit/e2e/docker/precommit`.
+- **justfile** — декларация типовых задач; прогон — в CI, локально необязателен.
 - **Playwright e2e** (`end2end/`): SSR-разметка, навигация, 404, `/api/health`.
 
 ## Быстрый старт
 
 ```bash
 bash scripts/setup.sh      # окружение (Linux/macOS): Docker, Node, Rust, инструменты
-just watch                 # dev-сервер: http://127.0.0.1:3000
-just build                 # релизная сборка (сервер + WASM + CSS)
-just precommit             # fmt + clippy + tests + rustdoc
-just docker                # docker compose up --build
+cargo leptos watch         # dev-сервер: http://127.0.0.1:3000
+cargo leptos build --release   # релизная сборка (сервер + WASM + CSS)
+docker compose -f deploy/docker-compose.yaml up --build
 ```
+
+Локальные проверки — прямыми cargo-командами (см.
+[docs/development.md](docs/development.md)); `just` локально не требуется —
+его роль выполняет CI. В CI-конвейере (fmt/clippy/tests/build/e2e/docker/smoke)
+та же связка гоняется на каждый push.
 
 > Windows: вместо `npm`/`npx` используйте `npm.cmd`/`npx.cmd` (политики выполнения
 > могут блокировать `*.ps1`) — подробности в [docs/development.md](docs/development.md).

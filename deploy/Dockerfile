@@ -34,7 +34,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates curl build-essential pkg-config \
-        musl-tools \
+        musl-tools lld \
     && rm -rf /var/lib/apt/lists/*
 
 # Rust + оба таргета: wasm (клиент/hydrate) и musl (сервер для Alpine).
@@ -42,8 +42,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
         --profile minimal --default-toolchain "${RUST_TOOLCHAIN}" \
     && rustup target add wasm32-unknown-unknown x86_64-unknown-linux-musl
 
-# Линковка musl-таргета через musl-gcc.
-ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc
+# musl-gcc сохраняет sysroot, lld выполняет линковку только musl-таргета.
+# Одинаковые параметры наследуются chef и финальной сборкой; WASM не затронут.
+ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc \
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C link-arg=-fuse-ld=lld" \
+    CC_x86_64_unknown_linux_musl=musl-gcc
 
 # Утилиты Docker-сборки: chef (кеш зависимостей) и cargo-leptos (SSR+WASM+CSS).
 # Ставим через cargo-binstall (готовые бинарники — минуты вместо десятков минут

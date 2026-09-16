@@ -1,3 +1,4 @@
+# Оркестратор: шаги вынесены в reusable workflows этого же коммита.
 name: CI
 
 on:
@@ -6,306 +7,52 @@ on:
     tags: ["v*"]
   pull_request:
 
-# fmt-джоба автокоммитит форматирование → нужен write на contents
 permissions:
-  contents: write
-
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Конвейер:
-#   1. fmt ∥ clippy            (параллельно)
-#   2. fmt автокоммитит правки («всегда вылизанный код»)
-#   3. test (+ wasm gate)      (после fmt+clippy)
-#   4. build-release           (musl-статик бинарник + WASM + CSS, артефакт)
-#   5. e2e ∥ docker            (параллельно, оба из артефакта релиза)
-#   6. smoke                   (отдельный стейдж: контейнер + HTTP-проверка)
-#   7. release                 (по тегу vX.Y.Z: CHANGELOG + GitHub Release)
-#   8. audit                   (параллельно всему конвейеру: cargo audit)
-# ─────────────────────────────────────────────────────────────────────────────
+  contents: read
 
 jobs:
-  # 1а. Форматирование + автокоммит ------------------------------------------
   fmt:
-    name: fmt (+ autocommit)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - name: cargo fmt
-        run: cargo fmt --all
+    permissions:
+      contents: write
+    uses: ./.github/workflows/fmt.yaml
 
-      # push в main: закоммитить и запушить «вылизанный» код
-      - name: Commit formatted code
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet; then
-            echo "✅ Форматирование в порядке, изменений нет"
-          else
-            git add -A
-            git commit -m "style: cargo fmt [skip ci]"
-            git push
-            echo "📝 Отформатированный код закоммичен"
-          fi
-
-      # PR: просто упасть, если код не отформатирован
-      - name: Check formatting (PR)
-        if: github.event_name == 'pull_request'
-        run: |
-          if ! git diff --quiet; then
-            git diff --name-only
-            echo "::error::Код не отформатирован — запустите локально 'cargo fmt --all'"
-            exit 1
-          fi
-
-  # 1б. Clippy (параллельно с fmt) --------------------------------------------
   clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: Clippy (base_template)
-        run: cargo clippy --features ssr --all-targets -- -D warnings
-      - name: Clippy (core-shared)
-        run: cargo clippy -p core-shared --all-targets -- -D warnings
+    uses: ./.github/workflows/clippy.yaml
 
-  # 2. Юнит-тесты + WASM-гейт --------------------------------------------------
-  test:
-    name: unit tests (+ wasm gate)
-    runs-on: ubuntu-latest
-    needs: [fmt, clippy]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
-      - name: Unit tests (base_template)
-        run: cargo test --features ssr --lib
-      # Крейт воркспейса тестируется отдельно: у него нет фич ssr/hydrate.
-      - name: Unit tests (core-shared)
-        run: cargo test -p core-shared
-      # Клиентская часть (hydrate) собирается только под wasm32: проверяем здесь,
-      # чтобы ошибки фронтенда не всплывали уже на релизной сборке.
-      - name: WASM gate (hydrate)
-        run: cargo check --features hydrate --lib --target wasm32-unknown-unknown
-
-  # 3. Релиз-сборка + артефакт -------------------------------------------------
-  build-release:
-    name: build (release)
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown x86_64-unknown-linux-musl
-      - uses: Swatinem/rust-cache@v2
-      - name: Install musl linker
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-      # cargo-binstall: тянет готовый бинарник cargo-leptos (минуты компиляции
-      # вместо десятков минут). Fallback — обычный cargo install.
-      - uses: cargo-bins/cargo-binstall@main
-      - name: Install cargo-leptos
-        run: cargo binstall -y cargo-leptos || cargo install cargo-leptos --locked
-      # Сервер — musl-статик (запускается и на ubuntu, и в alpine-образе),
-      # клиент — wasm. Конфигурация сборки — из [package.metadata.leptos].
-      - name: Build (release)
-        env:
-          LEPTOS_BIN_TARGET_TRIPLE: x86_64-unknown-linux-musl
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-        run: cargo-leptos build --release
-
-      # Собираем артефакт: бинарник + статика + конфиг
-      - name: Assemble dist
-        run: |
-          mkdir -p dist
-          cp target/x86_64-unknown-linux-musl/release/base_template dist/
-          cp -r target/site dist/site
-          cp -r config dist/config
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release
-          path: dist
-          retention-days: 3
-
-  # 4а. E2E (из артефакта релиза) ----------------------------------------------
-  e2e:
-    name: e2e (Playwright)
-    runs-on: ubuntu-latest
-    needs: build-release
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Download release artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: release
-      - name: Install npm deps
-        run: npm ci
-        working-directory: end2end
-      - name: Install Playwright browser
-        # В CI гоняем только chromium: остальные движки остаются доступны локально
-        # (`npx playwright test` без --project).
-        run: npx playwright install --with-deps chromium
-        working-directory: end2end
-      - name: Start server
-        run: |
-          chmod +x base_template
-          APP_SERVER_HOST=0.0.0.0 ./base_template > server.log 2>&1 &
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
-              echo "✅ Сервер готов (попытка $i)"
-              break
-            fi
-            sleep 1
-          done
-      - name: Run E2E tests
-        run: npx playwright test --project=chromium
-        working-directory: end2end
-        # BASE_URL читает end2end/playwright.config.ts (baseURL).
-        env:
-          BASE_URL: http://127.0.0.1:3000
-      - name: Server log on failure
-        if: failure()
-        run: cat server.log || true
-
-  # 4б. Docker-образ из готового бинарника (без пересборки в контейнере) -------
-  docker:
-    name: docker image (prebuilt binary)
-    runs-on: ubuntu-latest
-    needs: build-release
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download release artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: release
-      # Кладём артефакт в контекст сборки рядом с Dockerfile.prebuilt
-      - name: Assemble build context
-        run: |
-          mkdir -p context
-          chmod +x base_template
-          cp base_template context/
-          cp -r site context/site
-          cp -r config context/config
-          cp deploy/Dockerfile.prebuilt context/Dockerfile
-      - name: Build image
-        run: docker build -t base-template:ci context/
-      # Образ нужен отдельной smoke-джобе → сохраняем его в артефакт
-      - name: Save image
-        run: docker save base-template:ci | gzip > base-template-ci.tar.gz
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: base-template-ci.tar.gz
-          retention-days: 1
-
-  # 5. Отдельный стейдж смок-тестов --------------------------------------------
-  smoke:
-    name: smoke tests (container)
-    runs-on: ubuntu-latest
-    needs: docker
-    steps:
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-      - name: Load image
-        run: docker load -i base-template-ci.tar.gz
-      - name: Run container
-        run: |
-          docker run -d --name smoke -p 3000:3000 base-template:ci
-      - name: Wait for readiness
-        run: |
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
-              echo "✅ Контейнер готов (попытка $i)"
-              break
-            fi
-            sleep 1
-          done
-      - name: Smoke-test HTTP
-        run: |
-          set -euo pipefail
-          # SSR-разметка доступна без JS и содержит название приложения
-          curl -fsS http://127.0.0.1:3000/ | grep -q "base_template"
-          # Инфраструктурный health-эндпоинт отвечает ok (все коннекторы живы)
-          curl -fsS http://127.0.0.1:3000/api/health | grep -q '"status":"ok"'
-          echo "✅ Smoke-test passed"
-      - name: Cleanup
-        if: always()
-        run: docker rm -f smoke || true
-
-  # 6. Релиз по тегу vX.Y.Z ----------------------------------------------------
-  # CHANGELOG.md генерируется git-cliff из conventional commits (RULES.md §6) и
-  # коммитится в main; тем же инструментом строится тело GitHub Release.
-  # Версионирование: docs/versioning.md.
-  release:
-    name: release (git-cliff → GitHub Release)
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Generate CHANGELOG.md
-        uses: orhun/git-cliff-action@v4
-        with:
-          config: cliff.toml
-          args: --verbose
-        env:
-          OUTPUT: CHANGELOG.md
-      - name: Commit CHANGELOG
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- CHANGELOG.md; then
-            echo "ℹ️ CHANGELOG.md без изменений"
-          else
-            git add CHANGELOG.md
-            git commit -m "chore(release): CHANGELOG для ${{ github.ref_name }} [skip ci]"
-            git push origin HEAD:main || echo "⚠️ CHANGELOG не запушен (main ушёл вперёд)"
-          fi
-      - name: Generate release notes
-        id: notes
-        uses: orhun/git-cliff-action@v4
-        with:
-          config: cliff.toml
-          args: --latest --strip header
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body: ${{ steps.notes.outputs.content }}
-          draft: false
-
-  # 7. Аудит зависимостей (независимая джоба: идёт параллельно конвейеру) ------
   audit:
-    name: cargo audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: cargo-bins/cargo-binstall@main
-      - name: Install cargo-audit
-        run: cargo binstall -y cargo-audit || cargo install cargo-audit --locked
-      - name: Audit dependencies (RustSec Advisory DB)
-        run: cargo audit
+    uses: ./.github/workflows/audit.yaml
+
+  test:
+    needs: [fmt, clippy]
+    uses: ./.github/workflows/test.yaml
+
+  build-release:
+    needs: test
+    uses: ./.github/workflows/build-release.yaml
+
+  e2e:
+    needs: build-release
+    uses: ./.github/workflows/e2e.yaml
+
+  docker:
+    needs: build-release
+    uses: ./.github/workflows/docker.yaml
+
+  smoke:
+    needs: docker
+    uses: ./.github/workflows/smoke.yaml
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [smoke, e2e, audit]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish.yaml
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: publish
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yaml

@@ -1,0 +1,43 @@
+# Отдельный стейдж смок-тестов: контейнер + HTTP-проверки
+# (переиспользуемый workflow).
+name: smoke
+
+on:
+  workflow_call: {}
+
+jobs:
+  smoke:
+    name: smoke tests (container)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - name: Load image
+        run: docker load -i base-template-ci.tar.gz
+      - name: Run container
+        run: |
+          docker run -d --name smoke -p 3000:3000 base-template:ci
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "✅ Контейнер готов (попытка $i)"
+              break
+            fi
+            sleep 1
+          done
+      - name: Smoke-test HTTP
+        run: |
+          set -euo pipefail
+          # SSR-разметка доступна без JS и содержит название приложения
+          curl -fsS http://127.0.0.1:3000/ | grep -q "base_template"
+          # Инфраструктурный health-эндпоинт отвечает ok (все коннекторы живы)
+          curl -fsS http://127.0.0.1:3000/api/health | grep -q '"status":"ok"'
+          echo "✅ Smoke-test passed"
+      - name: Cleanup
+        if: always()
+        run: docker rm -f smoke || true

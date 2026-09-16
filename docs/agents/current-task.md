@@ -2,90 +2,74 @@
 
 ## Goal
 
-Фаза 7 [roadmap.md](../roadmap.md): вынести общие DTO из приложения в крейт
-воркспейса `crates/core-shared`, чтобы типы не дублировались между SSR-сервером и
-WASM-клиентом (RULES.md §5), и подготовить почву для доменных типов наследников.
+План [2026-09-16-build-pipeline-and-tech-debt.md](../plans/2026-09-16-build-pipeline-and-tech-debt.md):
+полная связка билда, техдолги, чистка локальной cargo-конфигурации, CD в GHCR.
 
 ## Scope
 
-- `Cargo.toml` — `[workspace] members`, `resolver`, path-зависимость `core-shared`.
-- `crates/core-shared/**` — крейт с DTO и тестами JSON-контракта.
-- `src/lib.rs`, `src/app.rs`, `src/main.rs`, удаление `src/dto.rs`.
-- CI-джобы `test`/`clippy`, `justfile` (`lint`, `test`) и `.dockerignore`.
-- Документация: architecture, stack, development, roadmap, current-state, AGENTS,
-  `docs/agents/*`.
+- `.cargo/config.toml`, `src/config.rs` (embedded-конфиг, `serde_yaml_ng`),
+  `src/app.rs` (timeout/retry), `Cargo.toml`.
+- CI: разбиение на reusable workflows, verify-артефакты, GHCR publish.
+- `scripts/setup.sh`, docs/*.
 
 ## Out of scope
 
-- `AppInfo` и прочие «типы на будущее» — в шаблоне нет потребителя.
-- Вынос серверных модулей (`connectors`, `error`, `logging`) в отдельные крейты.
-- Бизнес-слой, CD, миграция `serde_yaml`, timeout/retry клиентских запросов.
+- Бизнес-слой, devcontainer, правка глобального `~/.cargo/config.toml`.
+- Prerelease-теги в CD.
 
 ## Current status
 
-`completed` — компиляция и тесты подтверждены локально (toolchain-прогон 16.09.2026).
+`in_progress` — общий план техдолгов остаётся открытым.
+Задача mimalloc/lld реализована, но сборка с этими изменениями ещё не
+подтверждена CI. Прежние зелёные локальные гейты относятся к коду до аллокатора.
 
 ## Completed
 
-- Воркспейс: `[workspace] members = ["crates/core-shared"]`, `resolver = "2"`;
-  `[package.metadata.leptos]` оставлен только в корневом пакете.
-- Крейт `core-shared` (только `serde`): `HealthResponse`, `ConnectorHealthDto`;
-  3 юнит-теста — JSON-контракт, round-trip, отсутствие `connectors`.
-- `src/dto.rs` удалён; `src/app.rs` и `src/main.rs` используют `core_shared::*`.
-- CI: шаги `cargo test -p core-shared` и `cargo clippy -p core-shared --all-targets`;
-  justfile: `lint`/`test` покрывают оба пакета.
-- `.dockerignore`: исключён `.kilo` (вложенные worktrees не идут в контекст сборки).
-- Docs: раздел «Воркспейс» в architecture.md, обновлены stack/development/roadmap/
-  current-state/AGENTS/working-memory.
+- `.cargo/config.toml`: убраны `target-cpu=native` и `-fuse-ld=lld` (LNK4044 исчез).
+- Definition of done (билд после каждого логического этапа) — AGENTS.md, working-memory.
+- `just` выведен из локального процесса (setup.sh, development.md, README).
+- Verify build artifacts в `build-release.yaml` (CSS/WASM/musl).
+- Embedded-конфиг: `include_str!` + merge слоёв (embedded → файл → env) + 4 теста.
+- Миграция `serde_yaml` → `serde_yaml_ng` 0.10 (cargo check/test/clippy зелёные).
+- CI разбит: `ci.yaml` — оркестратор, 10 reusable-файлов `<job>.yaml`.
+- GHCR: `publish.yaml` по стабильному тегу, теги `vX.Y.Z-<sha12>`, `vX.Y.Z`,
+  `latest`; release ждёт publish.
 
 ## In progress
 
-Ничего.
+- Timeout/retry `/api/health` (gloo-timers) и chef для WASM — по плану следующие.
 
 ## Next steps
 
-1. `just build` (cargo-leptos + Tailwind + wasm-pack) — локально или в CI
-   (джоба `build-release`); `cargo check/test` уже зелёные.
-2. Дальше по [roadmap.md](../roadmap.md): compile-time конфиг, CD (публикация
-   образа), тег образа с версией, миграция `serde_yaml`.
+1. Пуш в main → первый прогон нового CI; затем тестовый релизный тег для GHCR.
+2. Этапы 5.5 (timeout/retry) и 5.4 (chef WASM).
+3. Подтвердить в GitHub Actions сборку mimalloc/lld из `temp.md`.
+   Реализация: native SSR allocator в `src/main.rs`, musl-only lld в CI/Docker;
+   решение — [ADR-002](../decisions/002-mimalloc-lld.md).
+   Локальные сборки, тесты и проверки workflow для этой задачи не запускать
+   по указанию владельца.
 
 ## Blockers
 
-Нет (таргет `wasm32-unknown-unknown` установлен на машину разработки).
+Нет. `cargo audit`/`cargo deny` локально не установлены — проверяются в CI.
 
 ## Files touched
 
-`Cargo.toml`, `Cargo.lock`, `crates/core-shared/Cargo.toml`,
-`crates/core-shared/src/lib.rs`, `src/lib.rs`, `src/app.rs`, `src/main.rs`,
-`src/dto.rs` (удалён), `.github/workflows/ci.yaml`, `justfile`,
-`.dockerignore`, `AGENTS.md`, `docs/architecture.md`, `docs/stack.md`,
-`docs/development.md`, `docs/roadmap.md`, `docs/current-state.md`, `docs/agents/*`.
+`.cargo/config.toml`, `.github/workflows/*` (9 новых + оркестратор), `Cargo.toml`,
+`Cargo.lock`, `src/config.rs`, `scripts/setup.sh`, `docs/*`, `AGENTS.md`, `README.md`.
 
 ## Checks run (16.09.2026, локальный toolchain)
 
-- `cargo fmt --all -- --check` → exit 0 (после `cargo fmt --all`).
-- `cargo check --features ssr` → exit 0.
-- `cargo clippy --features ssr --all-targets -- -D warnings` → ok.
-- `cargo test --features ssr` → 10 passed / 0 failed (включая тесты core-shared).
-- `cargo test -p core-shared` → 3 passed / 0 failed.
-- `cargo check --features hydrate --lib --target wasm32-unknown-unknown` → ok
-  (потребовался `rustup target add wasm32-unknown-unknown`).
-- `cargo doc --workspace --no-deps` → ok.
-- `end2end`: `npm install` + `npx tsc --noEmit` → exit 0.
-
-## Decisions made
-
-- `AppInfo` не создавали: тип без потребителя (добавляется наследниками).
-- `[[workspace.metadata.leptos]]` не добавляли — cargo-leptos должен видеть ровно
-  один проект (иначе потребуется `--project`).
-- В `core-shared` запрещены `leptos`/`axum`/`tokio`: крейт обязан собираться под
-  `wasm32-unknown-unknown`.
-- `resolver = "2"` указан явно, чтобы резолв фич не менялся неявно.
+- Гейт: fmt-check, check ssr (workspace), test ssr (13 passed), clippy -D warnings,
+  build ssr, wasm-гейт, doc, doctest — все exit 0 (`target/gate-results.txt`).
+- `cargo audit`/`cargo deny` — команды отсутствуют на машине (exit 101), см. CI.
+- `end2end`: tsc exit 0 (ранее в сессии); playwright --list exit 0 (24 теста).
 
 ## Risks
 
-- Совместимость `cargo-leptos` с воркспейсом подтверждена на уровне
-  `cargo metadata`/check; полный `cargo leptos build` — только в CI.
+- Оркестратор с reusable workflows и GHCR-публикация не подтверждены удалённым
+  прогоном (условия/права проверены статически).
+- `cargo-leptos build` (полная связка) — только в CI.
 
 ## Last updated
 

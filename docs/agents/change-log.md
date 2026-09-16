@@ -12,7 +12,49 @@
 - Risks:
 ```
 
-## 16.09.2026 — Фаза 7: воркспейс `crates/core-shared`
+## 16.09.2026 — Аллокатор mimalloc + lld для musl (задача из temp.md)
+
+- **Changed:** `Cargo.toml` — `mimalloc 0.1.52` (optional, `default-features =
+  false`) в `[target.'cfg(not(target_family = "wasm"))'.dependencies]` + `dep:mimalloc`
+  в фиче `ssr`; `src/main.rs` — `#[global_allocator]` только в SSR-бинарнике
+  (`cfg(all(feature = "ssr", not(target_family = "wasm")))`); `build-release.yaml` —
+  `lld` + `CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C link-arg=-fuse-ld=lld"`;
+  `deploy/Dockerfile` — `lld` в apt-слое и те же env в base-стейдже; `test.yaml` —
+  `cargo test --features ssr` теперь включает тестовую сборку SSR-бинарника в CI.
+- **Why:** задача 2 из `temp.md` («добавить lld и оптимизированный аллокатор в CI
+  и документацию»).
+- **Files:** `Cargo.toml`, `Cargo.lock`, `src/main.rs`,
+  `.github/workflows/build-release.yaml`, `.github/workflows/test.yaml`,
+  `deploy/Dockerfile`, `docs/decisions/002-mimalloc-lld.md` (новый), docs/*.
+- **Tests:** компиляция/тесты локально **не запускались** (решение владельца);
+  `cargo update --workspace` → exit 0 (lock: `mimalloc 0.1.52`,
+  `libmimalloc-sys 0.1.49`). Сборку подтверждает CI (`test` + `build-release`).
+- **Docs:** stack, deployment, current-state, roadmap, ADR-002.
+- **Risks:** mimalloc компилирует C (`cc`) — в CI/Docker тулчейн есть, локальный
+  MSVC должен иметь C-инструменты; выигрыш производительности не измерялся и не
+  заявляется.
+
+
+## 16.09.2026 — Техдолги, CI-оркестратор, GHCR
+
+- **Changed:** `.cargo/config.toml` без `target-cpu=native`/`-fuse-ld=lld`;
+  embedded-конфиг (`include_str!` + merge embedded→файл→env, `serde_yaml_ng`
+  0.10); definition of done в AGENTS/working-memory; `just` из локального
+  процесса убран; CI разбит на 10 reusable workflows + оркестратор `ci.yaml`;
+  verify-артефактов в `build-release`; `publish.yaml` → GHCR по стабильному тегу
+  (`vX.Y.Z-<sha12>`, `vX.Y.Z`, `latest`), release ждёт publish.
+- **Why:** техдолги roadmap, машинно-специфичные флаги не место в шаблоне,
+  GHCR выбран владельцем.
+- **Files:** перечислены в `docs/agents/current-task.md`.
+- **Tests:** локальный гейт — fmt/check/test(13)/clippy/build/wasm/doc/doctest
+  все exit 0; `cargo audit`/`deny` не установлены локально (в CI есть).
+- **Docs:** deployment, configuration, architecture, current-state, roadmap,
+  development, README, AGENTS, agents/*.
+- **Risks:** удалённый CI и GHCR не подтверждены; timeout/retry (5.5) и chef
+  WASM (5.4) не начаты. Аллокатор и lld реализованы следующей записью выше;
+  результат их сборки ожидается в CI.
+
+## 16.09.2026 — Фаза 7: core-shared
 
 - **Changed:** корневой манифест стал воркспейсом
   (`[workspace] members = ["crates/core-shared"]`, `resolver = "2"`); создан крейт

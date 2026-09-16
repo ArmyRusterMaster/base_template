@@ -11,6 +11,7 @@
 | **leptos_router** | Клиентский роутер | — |
 | **core-shared** | DTO, общие для сервера и клиента (крейт воркспейса) | — |
 | **tokio** | Async-рантайм | — |
+| **mimalloc** | Глобальный аллокатор native SSR-бинарника (`#[global_allocator]` в `src/main.rs`); WASM и lib не переопределяют | — |
 
 ## Движок сборки
 
@@ -19,6 +20,9 @@
   `LEPTOS_TAILWIND_VERSION`, по умолчанию v4.x).
 - **cargo-chef** — кеширование зависимостей в Docker.
 - **cargo-binstall** — быстрая установка инструментов (CI и Docker).
+- **lld** — линковщик musl-бинарника в CI и Docker (target-specific RUSTFLAGS;
+  WASM, host-таргет и локальный `.cargo/config.toml` не затронуты, см.
+  [ADR-002](decisions/002-mimalloc-lld.md)).
 - Профиль `wasm-release` в `Cargo.toml` — минимизация WASM (opt-level `z`, LTO,
   codegen-units=1, panic=abort).
 
@@ -38,8 +42,10 @@
 - **cargo fmt / clippy / test** — юнит-тесты конфигурации, коннекторов, `AppError`,
   версии.
 - **WASM-гейт** — `cargo check --features hydrate --lib --target wasm32-unknown-unknown`.
-- **cargo-audit** — аудит уязвимостей зависимостей (локально и в CI).
-- **just** — типовые задачи: `just precommit` (fmt + clippy + tests + rustdoc).
+- **cargo-audit** — аудит уязвимостей зависимостей (джоба `audit` в CI).
+- **justfile** — сохранён как перечень рецептов; локальная установка `just` не
+  требуется, проверки запускаются прямыми cargo-командами и в CI.
+- **serde_yaml_ng 0.10** — разбор embedded/дискового YAML на старте.
 
 ## Среды исполнения
 

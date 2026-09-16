@@ -29,6 +29,11 @@ use leptos_axum::{generate_route_list, LeptosRoutes};
 #[cfg(feature = "ssr")]
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 
+/// Глобальный аллокатор native SSR-бинарника; библиотека и WASM его не задают.
+#[cfg(all(feature = "ssr", not(target_family = "wasm")))]
+#[global_allocator]
+static GLOBAL_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 /// Состояние приложения: опции Leptos + реестр коннекторов.
 #[cfg(feature = "ssr")]
 #[derive(Clone)]

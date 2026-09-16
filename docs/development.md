@@ -32,23 +32,30 @@ just watch          # dev-сервер с live-reload (127.0.0.1:3000)
 cargo leptos watch
 ```
 
-## Рецепты `just`
+## Рецепты `just` — опционально, прогон в CI
 
-`justfile` — единая точка входа; `just --list` показывает все рецепты.
+`justfile` остаётся в репозитории как **декларация задач**, но локально `just`
+не ставится (осознанное решение — не загромождать машину посторонним ПО), а его
+роль на себя берёт CI: джобы `fmt`/`clippy`/`test`/`build-release`/`e2e`/`docker`
+прогоняют эквиваленты рецептов на каждый push.
 
-| Рецепт | Что делает |
-|---|---|
-| `just watch` | dev-сервер с live-reload |
-| `just build` | релизная сборка: сервер (ssr) + WASM (hydrate) + CSS → `target/site` |
-| `just serve` | запуск релизной сборки локально |
-| `just fmt` / `just fmt-check` | форматирование / проверка формата (как в CI) |
-| `just lint` | `cargo clippy --features ssr --all-targets -- -D warnings` |
-| `just test` | юнит-тесты (`--features ssr`) + WASM-гейт |
-| `just doc` | rustdoc без зависимостей |
-| `just audit` | `cargo audit` |
-| `just e2e` | Playwright (нужен запущенный сервер; можно `just e2e --project=firefox`) |
-| `just docker` | `docker compose -f deploy/docker-compose.yaml up --build` |
-| `just precommit` | fmt + clippy + tests + rustdoc |
+Если `just` всё же установлен локально (`cargo binstall -y just`), рецепты
+работают как описано ниже; в противном случае пользуйтесь прямыми
+cargo-командами из раздела «Качество».
+
+| Рецепт | Что делает | CI-эквивалент |
+|---|---|---|
+| `just watch` | dev-сервер с live-reload | — |
+| `just build` | релизная сборка: сервер (ssr) + WASM (hydrate) + CSS → `target/site` | `build-release` |
+| `just serve` | запуск релизной сборки локально | — |
+| `just fmt` / `just fmt-check` | форматирование / проверка формата (как в CI) | `fmt` |
+| `just lint` | `cargo clippy --features ssr --all-targets -- -D warnings` + core-shared | `clippy` |
+| `just test` | юнит-тесты (`--features ssr`) + core-shared + WASM-гейт | `test` |
+| `just doc` | rustdoc без зависимостей | — |
+| `just audit` | `cargo audit` | `audit` |
+| `just e2e` | Playwright (нужен запущенный сервер; можно `just e2e --project=firefox`) | `e2e` |
+| `just docker` | `docker compose -f deploy/docker-compose.yaml up --build` | `docker`/`smoke` |
+| `just precommit` | fmt + clippy + tests + rustdoc | весь конвейер |
 
 ## Сборка и запуск
 

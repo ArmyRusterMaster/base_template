@@ -1,0 +1,31 @@
+# Юнит-тесты + WASM-гейт (переиспользуемый workflow).
+name: test
+
+on:
+  workflow_call: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: unit tests (+ wasm gate)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Unit tests (base_template)
+        run: cargo test --features ssr
+      # Крейт воркспейса тестируется отдельно: у него нет фич ssr/hydrate.
+      - name: Unit tests (core-shared)
+        run: cargo test -p core-shared
+      # Клиентская часть (hydrate) собирается только под wasm32: проверяем здесь,
+      # чтобы ошибки фронтенда не всплывали уже на релизной сборке.
+      - name: WASM gate (hydrate)
+        run: cargo check --features hydrate --lib --target wasm32-unknown-unknown

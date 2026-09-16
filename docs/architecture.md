@@ -35,7 +35,7 @@
 
 | Слой | Модули | Ответственность |
 |---|---|---|
-| Конфигурация | `config.rs` | слои `defaults` → `config/app.yaml` → `APP_*`, fail-fast-валидация |
+| Конфигурация | `config.rs` | embedded YAML → файл → `APP_*`, Default для пропусков, fail-fast на старте; [контракт](configuration.md) |
 | Наблюдаемость | `logging.rs`, `version.rs` | `tracing`-подписчик, версия сборки `vX.Y.Z-<hash>` |
 | Ошибки | `error.rs` | единый `AppError` для handler-ов axum; наружу — только безопасный JSON |
 | Интеграции | `connectors/mod.rs` | контракт `Connector` + реестр; конкретные интеграции — в наследниках |
@@ -98,8 +98,8 @@ DOM — переходы между страницами без полной п�
 
 ### Конфигурация
 
-`src/config.rs` — слои: `defaults` → `config/app.yaml` → `APP_*` env.
-Валидация: типы serde (на этапе компиляции), значения — при старте (fail-fast).
+`src/config.rs` — embedded YAML → файл → `APP_*`; пропуски получают Default.
+Текст встраивается при компиляции, разбор YAML и валидация — на старте (fail-fast).
 Подробнее: [configuration.md](configuration.md).
 
 ## Компоненты Leptos

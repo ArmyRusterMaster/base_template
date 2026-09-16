@@ -113,11 +113,21 @@
 ## Среднесрочные
 
 - [x] cargo-audit в отдельной джобе.
-- [ ] Тег Docker-образа с версией (`vX.Y.Z-<hash>`) и публикация в реестр (CD).
-- [ ] Compile-time конфиг (serde + `include_str!`).
-- [ ] Миграция `serde_yaml` → `serde_yml`/`yaml-rust2`.
+- [ ] Тег Docker-образа с версией и GHCR: джоба `publish` реализована,
+  теги `vX.Y.Z-<12-char SHA>`, `vX.Y.Z`, `latest`; ожидает первого CI/релиза.
+- [x] Embedded-конфиг через `include_str!`: YAML разбирается на старте,
+  затем дисковый слой и env; это не compile-time валидация YAML.
+- [x] Миграция `serde_yaml` → `serde_yaml_ng` 0.10.
 - [ ] Отдельный `cargo chef cook` для WASM-зависимостей (`--target-dir target/front`).
 - [ ] Timeout/retry для клиентских запросов к API.
+- [x] lld для musl-линковки в CI/Docker + mimalloc как аллокатор SSR-бинарника
+  (из `temp.md`; см. [ADR-002](decisions/002-mimalloc-lld.md)); локальные
+  компиляции не запускались — подтверждение сборки в CI.
+
+Активный [план техдолгов](plans/2026-09-16-build-pipeline-and-tech-debt.md)
+имеет статус `in_progress`. Полная связка билда проверяется в CI; локально —
+прямые cargo-команды и SSR-билд после каждого логического этапа.
+Установка/освоение `just` не является пунктом текущего roadmap.
 
 ## Шаблон микросааса (наследник) — НЕ в этой базе
 

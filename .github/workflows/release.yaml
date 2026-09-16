@@ -1,0 +1,51 @@
+# Релиз по тегу vX.Y.Z (переиспользуемый workflow).
+# CHANGELOG.md генерируется git-cliff из conventional commits (RULES.md §6) и
+# коммитится в main; тем же инструментом строится тело GitHub Release.
+# Версионирование: docs/versioning.md.
+name: release
+
+on:
+  workflow_call: {}
+
+jobs:
+  release:
+    name: release (git-cliff → GitHub Release)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Generate CHANGELOG.md
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+      - name: Commit CHANGELOG
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "ℹ️ CHANGELOG.md без изменений"
+          else
+            git add CHANGELOG.md
+            git commit -m "chore(release): CHANGELOG для ${{ github.ref_name }} [skip ci]"
+            git push origin HEAD:main || echo "⚠️ CHANGELOG не запушен (main ушёл вперёд)"
+          fi
+      - name: Generate release notes
+        id: notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.content }}
+          draft: false

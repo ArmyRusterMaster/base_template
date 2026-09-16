@@ -43,13 +43,22 @@ hydration) + Axum 0.8**. Бизнес-логики нет: это каркас, 
 
 ## Команды
 
+`just` локально не ставится — его роль выполняет CI. Прямые команды:
+
 ```bash
-just --list        # список рецептов
-just watch         # dev-сервер (127.0.0.1:3000)
-just precommit     # fmt + clippy + tests + rustdoc
-just test          # юнит-тесты + wasm-гейт
-just e2e           # Playwright (нужен запущенный сервер)
+cargo fmt --all -- --check          # = рецепт fmt-check
+cargo clippy --features ssr --all-targets -- -D warnings   # = lint (+ core-shared)
+cargo clippy -p core-shared --all-targets -- -D warnings
+cargo test --features ssr           # = test
+cargo test -p core-shared
+cargo check --features hydrate --lib --target wasm32-unknown-unknown   # WASM-гейт
+cargo build --features ssr          # = build
+cargo audit                         # = audit
 ```
+
+Full-связка (`cargo leptos build --release`) прогоняется в CI; локальный
+dev-сервер — `cargo leptos watch`. Полный список рецептов — [justfile](justfile),
+соответствие рецептам — [docs/development.md](docs/development.md).
 
 Эквивалент вручную (и то, что гоняет CI):
 
@@ -62,6 +71,31 @@ cargo test -p core-shared
 cargo check --features hydrate --lib --target wasm32-unknown-unknown
 cargo audit
 ```
+
+## Definition of done (билд после каждого логического этапа)
+
+Любой логический этап работы (фича, рефакторинг, техдолг) считается
+завершённым только после локального гейта:
+
+```bash
+cargo fmt --all -- --check
+cargo check --features ssr
+cargo test --features ssr        # включает cargo test -p core-shared
+cargo clippy --features ssr --all-targets -- -D warnings
+cargo build --features ssr       # линковка, а не только проверка типов
+```
+
+и wasm-гейта перед коммитом:
+
+```bash
+cargo check --features hydrate --lib --target wasm32-unknown-unknown
+```
+
+Полная связка (`cargo leptos build`: Tailwind + wasm-pack) локально **не**
+требуется — её проверяет CI (джоба `build-release` с шагом верификации
+артефактов). Записи о пройденных гейтах фиксируются в
+[docs/agents/current-task.md](docs/agents/current-task.md) и
+[docs/agents/change-log.md](docs/agents/change-log.md).
 
 ## Known pitfalls
 

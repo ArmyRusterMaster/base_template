@@ -11,6 +11,9 @@
   `src/main.rs` (axum-сервер), `src/lib.rs` (hydrate); маршруты `/`, `/account`,
   `/status`, 404 внутри layout.
 - **Graceful shutdown** (Ctrl+C / SIGTERM) — `src/main.rs`.
+- **Аллокатор SSR-бинарника** — `mimalloc` (native-only, `#[global_allocator]` в
+  `src/main.rs`); WASM/lib не переопределяют аллокатор; линковка musl в CI/Docker —
+  lld. См. [ADR-002](decisions/002-mimalloc-lld.md).
 - **Типизированная конфигурация** — `src/config.rs` + `config/app.yaml` +
   переменные `APP_*`: слои, fail-fast-валидация, юнит-тесты.
 - **Observability** — `src/logging.rs` (`RUST_LOG` → `log_level` → `info`),
@@ -33,32 +36,33 @@
 - **Docker** — мультистейдж `deploy/Dockerfile` (Ubuntu → Alpine, cargo-chef,
   cargo-binstall, cargo-leptos, musl-статик), `deploy/Dockerfile.prebuilt` для CI,
   `deploy/docker-compose.yaml` с healthcheck.
-- **CI/CD** — `.github/workflows/ci.yaml`: fmt (+автокоммит) ∥ clippy ∥ audit →
-  test (+ wasm-гейт) → build-release → e2e ∥ docker → smoke → release (по тегу).
-- **justfile** — типовые задачи: `just watch/build/serve/fmt/lint/test/e2e/docker/precommit`.
-- **Setup-скрипт** — `scripts/setup.sh`: Docker, Node, Rust + wasm, cargo-binstall,
-  cargo-leptos, leptosfmt, just, cargo-audit, git-cliff, npm-зависимости e2e.
+- **CI/CD** — `.github/workflows/ci.yaml` — оркестратор 10 reusable workflows:
+  fmt/clippy/audit → test → build-release → e2e/docker → smoke → publish → release.
+  GHCR реализован; удалённая публикация пока не проверена.
+- **justfile** — сохранён как перечень рецептов, локально just не требуется.
+- **Setup-скрипт** — `scripts/setup.sh`: установка just убрана. Скрипт настройки
+  остальных инструментов локально в этой задаче не запускался.
 - **E2E** — `end2end/` (Playwright): константы и `BASE_URL` из env, тесты главной,
   навигации/404 и `/api/health` (см. [development.md](development.md)).
 - **Документация** — `docs/` (+ `docs/agents/` — рабочие заметки агентов).
 
 ## In progress
 
-Активной задачи нет. Текущий статус и следующий шаг — в
-[agents/current-task.md](agents/current-task.md), историческое состояние — в
-[agents/change-log.md](agents/change-log.md).
+Активен [план техдолгов](plans/2026-09-16-build-pipeline-and-tech-debt.md),
+статус `in_progress`: embedded-конфиг и миграция парсера реализованы,
+CI/GHCR ждут удалённой проверки. Следующие задачи — timeout/retry и WASM chef.
+Прогресс — в [agents/current-task.md](agents/current-task.md).
 
 ## Planned
 
-- см. [roadmap.md](roadmap.md): compile-time конфиг, CD (публикация образа),
-  тег Docker-образа с версией, миграция `serde_yaml`, timeout/retry для
-  клиентских запросов.
+- см. [roadmap.md](roadmap.md): timeout/retry, WASM chef, подтверждение полного
+  CI и GHCR первым удалённым прогоном.
 
 ## Known limitations
 
-- **Полная сборка бинарника и `cargo-leptos build` в этой сессии не запускались**:
-  компиляция подтверждена `cargo check/clippy/test/doc` (см. Last verified), но
-  связка cargo-leptos + Tailwind + wasm-pack (`just build`) не прогонялась.
+- **SSR-бинарник собран локально** (`cargo build --features ssr`, exit 0).
+  Полная связка cargo-leptos + Tailwind + WASM локально не запускалась;
+  шаг проверки CSS/WASM/musl добавлен в `build-release.yaml`, ожидает CI.
 - **Совместимость cargo-leptos с воркспейсом** подтверждена на уровне
   `cargo metadata`/check: `[package.metadata.leptos]` в корневом пакете даёт
   единственный проект; полный `cargo leptos build` проверяется в CI
@@ -68,8 +72,8 @@
   в CI (джоба `docker`).
 - **E2E в CI — только chromium** (`npx playwright test --project=chromium`);
   firefox/webkit доступны локально.
-- `serde_yaml` помечен deprecated на crates.io — миграция на `serde_yml`/
-  `yaml-rust2` запланирована.
+- Конфиг мигрирован на `serde_yaml_ng` 0.10; embedded-текст разбирается на старте.
+  `cargo audit`/`cargo deny` локально недоступны; аудит ожидается в CI.
 - **sccache отключён локально** (`.cargo/config.toml`, `rustc-wrapper = ""`) —
   sccache падает на Windows при компиляции `web-sys`.
 - WASM-зависимости в Docker кешируются не полностью (возможен отдельный
@@ -91,6 +95,10 @@
 
 ## Last verified
 
+- **16.09.2026**: задача из `temp.md` (аллокатор + lld): `Cargo.lock` обновлён
+  (`cargo update --workspace` → exit 0; в lock `mimalloc 0.1.52`,
+  `libmimalloc-sys 0.1.49`). Компиляция/тесты локально не запускались (решение
+  владельца) — сборку подтверждает CI (`test` + `build-release`).
 - **16.09.2026**: локальный toolchain-прогон (Windows, stable MSVC, wasm-таргет
   добавлен): `cargo fmt --all -- --check` → ok; `cargo check --features ssr` →
   exit 0; `cargo clippy --features ssr --all-targets -- -D warnings` → ok (только

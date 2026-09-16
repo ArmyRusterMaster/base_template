@@ -1,0 +1,45 @@
+# Форматирование + автокоммит на push в main (переиспользуемый workflow).
+name: fmt
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fmt:
+    name: fmt (+ autocommit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: cargo fmt
+        run: cargo fmt --all
+
+      # push в main: закоммитить и запушить «вылизанный» код
+      - name: Commit formatted code
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "✅ Форматирование в порядке, изменений нет"
+          else
+            git add -A
+            git commit -m "style: cargo fmt [skip ci]"
+            git push
+            echo "📤 Отформатированный код закоммичен"
+          fi
+
+      # PR: просто упасть, если код не отформатирован
+      - name: Check formatting (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          if ! git diff --quiet; then
+            git diff --name-only
+            echo "::error::Код не отформатирован — запустите локально 'cargo fmt --all'"
+            exit 1
+          fi

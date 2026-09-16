@@ -23,7 +23,9 @@ leptos_meta = { version = "0.8.0" }
 tokio = { version = "1", features = ["rt-multi-thread", "signal", "macros"], optional = true }
 wasm-bindgen = { version = "0.2.106", optional = true }
 serde = { version = "1", features = ["derive"] }
-serde_yaml = "0.9"
+# YAML: serde_yaml заархивирован, serde_yml тоже помечен deprecated (шим над
+# noyalib). serde_yaml_ng 0.10 — drop-in форк serde_yaml 0.9 с тем же API.
+serde_yaml_ng = "0.10"
 # Общие DTO (клиент + сервер) — отдельный крейт воркспейса.
 core-shared = { path = "crates/core-shared" }
 # leptos-use 0.19.x совместим с leptos 0.8 (см. docs/stack.md).
@@ -38,6 +40,10 @@ async-trait = { version = "0.1.92", optional = true }
 serde_json = { version = "1.0.151", optional = true }
 gloo-net = "0.7.0"
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+# Аллокатор только native SSR; wasm использует стандартный аллокатор Rust.
+mimalloc = { version = "0.1.52", optional = true, default-features = false }
+
 [features]
 hydrate = [
     "leptos/hydrate",
@@ -45,6 +51,7 @@ hydrate = [
     "dep:wasm-bindgen",
 ]
 ssr = [
+    "dep:mimalloc",
     "dep:axum",
     "dep:tokio",
     "dep:leptos_axum",

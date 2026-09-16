@@ -135,8 +135,11 @@ install_tool cargo-leptos cargo-leptos
 # 4. Установка форматировщика для макросов view!
 install_tool leptosfmt leptosfmt
 
-# 5. just — единая точка входа для типовых задач (см. justfile)
-install_tool just just
+# 5. just — НЕ УСТАНАВЛИВАЕТСЯ локально (осознанное решение)
+# justfile остаётся в репозитории как декларация задач; его роль на себя берёт CI
+# (эквиваленты рецептов — это джобы fmt/clippy/test/build-release/e2e/docker).
+# Локально используем прямые cargo-команды (docs/development.md → «Качество»).
+# Если just всё же нужен — `cargo binstall -y just` вручную.
 
 # 6. Установка утилит безопасности и аудита
 install_tool cargo-audit cargo-audit

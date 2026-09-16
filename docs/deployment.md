@@ -21,8 +21,8 @@ run      (Alpine 3.20)   статический бинарник + site + config
 - **Tailwind**: standalone-бинарник скачивает cargo-leptos на этапе сборки —
   в образе рантайма ничего дополнительно не нужно.
 - **Сервер собирается под musl** (`LEPTOS_BIN_TARGET_TRIPLE=x86_64-unknown-linux-musl`,
-  линковщик musl-gcc) → полностью статический бинарник, который запускается
-  на Alpine без glibc.
+  линковщик musl-gcc, компоновка через lld) → полностью статический бинарник,
+  который запускается на Alpine без glibc.
 - **cargo-chef** кеширует зависимости в отдельном слое — повторные билды быстрые.
 - В рантайме ENV: `LEPTOS_SITE_ROOT=/app/site`, `LEPTOS_SITE_PKG_DIR=pkg`,
   `APP_SERVER_HOST=0.0.0.0`, `APP_SERVER_PORT=3000`.
@@ -48,6 +48,13 @@ docker compose -f deploy/docker-compose.yaml up --build
 
 Конвейер (порядок + параллельность):
 
+`ci.yaml` — только оркестратор (`needs`, условия, права). Каждая джоба вынесена
+в одноимённый `.github/workflows/<job>.yaml` с `workflow_call`. Они вызываются
+из того же коммита и обмениваются артефактами одного запуска. Workflow-level
+`env` родителя не наследуется — нужные переменные заданы в дочерних файлах.
+Права write разрешены также на вызывающих jobs, поскольку дочерний workflow
+не может повысить права токена. GITHUB_TOKEN доступен без `secrets: inherit`.
+
 ```
 1. fmt ∥ clippy ∥ audit — параллельно
 2. fmt автокоммит      — push в main коммитит отформатированный код ([skip ci]);
@@ -58,7 +65,8 @@ docker compose -f deploy/docker-compose.yaml up --build
                          e2e    — Playwright (chromium) против бинарника;
                          docker — образ из готового бинарника (Dockerfile.prebuilt)
 6. smoke               — отдельный стейдж: запуск контейнера + HTTP-проверки
-7. release             — только по тегу vX.Y.Z: CHANGELOG.md (git-cliff) + GitHub Release
+7. publish             — по стабильному тегу: GHCR, ждёт smoke + e2e + audit
+8. release             — после publish: CHANGELOG.md (git-cliff) + GitHub Release
 ```
 
 | Джоба | Что делает |
@@ -67,7 +75,7 @@ docker compose -f deploy/docker-compose.yaml up --build
 | `clippy` | `cargo clippy --features ssr --all-targets -- -D warnings` |
 | `audit` | `cargo audit` (RustSec Advisory DB), независимая джоба |
 | `test` | `cargo test --features ssr --lib` + `cargo check --features hydrate --lib --target wasm32-unknown-unknown` |
-| `build-release` | `cargo-leptos build --release` (musl-сервер) + upload артефакта `dist/` |
+| `build-release` | Установка `musl-tools` + `lld`; `cargo-leptos build --release` (musl-сервер, линковка lld, mimalloc в бинарнике) + upload артефакта `dist/` |
 | `e2e` | Скачивает артефакт, ждёт готовности `/api/health`, гоняет Playwright (`--project=chromium`, `BASE_URL`) |
 | `docker` | Собирает образ из артефакта (`deploy/Dockerfile.prebuilt`), сохраняет в артефакт |
 | `smoke` | Загружает образ, запускает контейнер, проверяет `/` и `/api/health` |
@@ -77,4 +85,28 @@ docker compose -f deploy/docker-compose.yaml up --build
 фиксированного `sleep`), поэтому джобы устойчивы к разной скорости старта.
 
 Версионирование, теги и генерация CHANGELOG — [versioning.md](versioning.md).
-Публикация образов/деплой (CD) — план, см. [roadmap.md](roadmap.md).
+
+## Публикация в GHCR
+
+Джоба `publish` в `.github/workflows/ci.yaml` реализована; первый удалённый
+прогон ещё не подтверждён. Запускается только на push тега стабильной версии
+`vX.Y.Z`, после успешных `smoke`, `e2e` и `audit`. GitHub Release ждёт `publish`.
+PR не публикуют образы. Пререлизные теги пока не поддерживаются.
+
+Публикуется **тот же** `base-template:ci` из артефакта `docker-image`, который
+прошёл smoke, без пересборки. Адрес — `ghcr.io/<owner>/<repository>` в нижнем
+регистре; теги — `vX.Y.Z-<12 символов commit SHA>`, `vX.Y.Z`, `latest`.
+`latest` означает последний успешно опубликованный релиз, а не обязательно
+максимальную версию: повторный запуск старого релиза может переместить тег.
+Для воспроизводимого развёртывания используйте digest образа, а не `latest`.
+
+Авторизация — стандартный `GITHUB_TOKEN` через `docker login --password-stdin`.
+`packages: write` есть только у `publish`; `contents: write` — у существующих
+джоб `fmt` и `release`. Остальные джобы имеют `contents: read`.
+Организация должна разрешать Actions публиковать packages; для уже существующего
+пакета нужно предоставить этому репозиторию доступ. Видимость пакета настраивается
+в GHCR отдельно. PAT и установка инструментов локально не требуются.
+
+Пуш трёх тегов не атомарен: при частичном отказе возможна публикация части тегов.
+Повторный запуск использует тот же артефакт, пока он доступен (retention — 1 день).
+Автоматический деплой на сервер не реализован.

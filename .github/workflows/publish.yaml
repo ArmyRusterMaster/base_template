@@ -1,0 +1,43 @@
+# CD: публикация проверенного образа в GHCR (переиспользуемый workflow).
+#
+# Публикуется тот же образ, который прошёл smoke, без повторной сборки.
+# Только push стабильного тега vX.Y.Z; теги: версия, версия+SHA, latest.
+name: publish
+
+on:
+  workflow_call: {}
+
+jobs:
+  publish:
+    name: publish (GHCR)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - name: Load tested image
+        run: docker load -i base-template-ci.tar.gz
+      - name: Publish versioned image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Только стабильные версии; latest не должен указывать на prerelease.
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected stable release tag vX.Y.Z"
+            exit 1
+          fi
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          revision="${RELEASE_TAG}-${GITHUB_SHA:0:12}"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for tag in "$revision" "$RELEASE_TAG" latest; do
+            docker tag base-template:ci "$image:$tag"
+            docker push "$image:$tag"
+          done
+      - name: Logout
+        if: always()
+        run: docker logout ghcr.io

@@ -27,6 +27,13 @@
 
 ## Соглашения
 
+- **Definition of done**: билд-гейт после каждого логического этапа (fmt-check,
+  check ssr, tests, clippy, build ssr; wasm-гейт перед коммитом) — см.
+  [AGENTS.md](../../AGENTS.md) → «Definition of done». Полная связка
+  cargo-leptos проверяется в CI, локально не требуется.
+- **`just` локально не ставится** (машину не загромождаем посторонним ПО):
+  justfile — декларация задач, прогон — в CI; локально используем прямые
+  cargo-команды из раздела «Качество» в [development.md](../development.md).
 - Коммиты — conventional commits (`feat:`, `fix:`, `docs:`, ...), формат версии —
   `vX.Y.Z-<hash>`; `CHANGELOG.md` генерируется git-cliff, руками не правится.
 - Стилизация — только Tailwind-утилиты в `view!`-макросах; JS-конфиг Tailwind не
@@ -37,10 +44,14 @@
 ## Команды проверки
 
 ```bash
-just precommit        # fmt + clippy (app + core-shared) + tests + rustdoc
-just test             # cargo test --features ssr + cargo test -p core-shared + wasm-гейт
-just e2e              # Playwright против локального сервера
-cargo audit           # уязвимости зависимостей
+cargo fmt --all -- --check
+cargo check --workspace --all-targets --features ssr
+cargo test --workspace --features ssr
+cargo clippy --workspace --features ssr --all-targets -- -D warnings
+cargo build --features ssr
+cargo check --features hydrate --lib --target wasm32-unknown-unknown
+cargo doc --workspace --no-deps
+# cargo audit выполняется в CI, если локально инструмент не установлен.
 ```
 
 ## Known pitfalls
@@ -49,10 +60,13 @@ cargo audit           # уязвимости зависимостей
 - `path!` — для маршрутов; `StaticSegment` — в корне `leptos_router`.
 - `spawn_local` из `leptos::task` (не в prelude); сигналы не `Send`.
 - `thaw-ui` 0.4 несовместим с leptos 0.8.
-- Tailwind v4 подтягивает бинарник сам cargo-leptos; ручная установка CLI ломает
-  версию.
+- Tailwind v4: бинарник подтягивает cargo-leptos, глобальный CLI не нужен.
 - Windows: `npm.cmd`/`npx.cmd`, sccache отключён (`.cargo/config.toml`).
-- `docker`/`cargo` на некоторых рабочих машинах недоступны → проверяем в CI.
+- YAML 1.1-парсеры могут трактовать `on` как boolean; это свойство парсера,
+  не PowerShell/`Set-Content`. Проверка YAML не заменяет проверку GitHub Actions.
+- **Reusable workflows**: вызывающая джоба должна разрешать необходимые
+  `permissions`: дочерний workflow не может повысить права `GITHUB_TOKEN`.
+  Workflow-level `env` родителя не наследуется.
 
 ## Решения, которые нельзя отменять без review
 

@@ -1,0 +1,38 @@
+# Docker-образ из готового бинарника — без пересборки в контейнере
+# (переиспользуемый workflow). Образ нужен smoke и publish → сохраняем в артефакт.
+name: docker
+
+on:
+  workflow_call: {}
+
+jobs:
+  docker:
+    name: docker image (prebuilt binary)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+      # Кладём артефакт в контекст сборки рядом с Dockerfile.prebuilt
+      - name: Assemble build context
+        run: |
+          mkdir -p context
+          chmod +x base_template
+          cp base_template context/
+          cp -r site context/site
+          cp -r config context/config
+          cp deploy/Dockerfile.prebuilt context/Dockerfile
+      - name: Build image
+        run: docker build -t base-template:ci context/
+      - name: Save image
+        run: docker save base-template:ci | gzip > base-template-ci.tar.gz
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: base-template-ci.tar.gz
+          retention-days: 1

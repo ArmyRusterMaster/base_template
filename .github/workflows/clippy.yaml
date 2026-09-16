@@ -1,0 +1,25 @@
+# Линтер (переиспользуемый workflow).
+name: clippy
+
+on:
+  workflow_call: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy (base_template)
+        run: cargo clippy --features ssr --all-targets -- -D warnings
+      - name: Clippy (core-shared)
+        run: cargo clippy -p core-shared --all-targets -- -D warnings
