@@ -1,3 +1,7 @@
+// Leptos hydration generates deeply nested view/future types. The WASM release
+// build exceeds rustc's default recursion limit (see CI query-depth overflow).
+#![recursion_limit = "256"]
+
 pub mod app;
 pub mod components;
 pub mod config;

@@ -83,6 +83,12 @@ CI/GHCR ждут удалённой проверки. Следующие зад�
 
 ## Open risks
 
+- **2026-09-17, лог CI владельца:** WASM release упал с
+  `queries overflow the depth limit` при вычислении layout `hydrate_async`.
+  Серверная musl-сборка завершилась успешно. В `src/lib.rs` лимит компилятора
+  поднят до 256 по рекомендации rustc; исправление ожидает повторного CI.
+  Игнорируемый `metadata.leptos.env` удалён из `Cargo.toml`.
+
 - `leptos_router::components::A` в 0.8 не принимает `class` как prop — стили
   передаются через attribute spreading (`attr:class`). При обновлении
   `leptos_router` синтаксис нужно перепроверить.

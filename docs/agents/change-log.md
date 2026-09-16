@@ -12,6 +12,18 @@
 - Risks:
 ```
 
+## 2026-09-17 — WASM release: query-depth overflow
+
+- Changed: `src/lib.rs` — `recursion_limit = "256"` по рекомендации rustc;
+  из `Cargo.toml` удалён неподдерживаемый `metadata.leptos.env`.
+- Why: полный лог CI показывает overflow layout типов `hydrate_async` Leptos;
+  серверная musl-сборка закончилась успешно, общий cargo-leptos — exit 1.
+- Tests: разобран лог владельца и просмотрен diff. Локальные сборки/тесты
+  и проверки workflow не запускались по указанию владельца. Нужен повтор CI.
+- Risks: исправление ещё не подтверждено release-сборкой WASM;
+  runtime/API и mimalloc/lld не менялись.
+
+
 ## 16.09.2026 — Аллокатор mimalloc + lld для musl (задача из temp.md)
 
 - **Changed:** `Cargo.toml` — `mimalloc 0.1.52` (optional, `default-features =

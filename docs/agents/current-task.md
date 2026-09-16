@@ -37,6 +37,12 @@
 
 ## In progress
 
+- Приоритет: исправление падения WASM release из лога CI владельца
+  (2026-09-17): `queries overflow the depth limit` в `hydrate_async`.
+  В `src/lib.rs` добавлен `recursion_limit = "256"`; из `Cargo.toml` убран
+  игнорируемый `metadata.leptos.env`. SSR в присланном логе собрался успешно.
+  Исправление ожидает повторного CI; локальные сборки не запускались.
+
 - Timeout/retry `/api/health` (gloo-timers) и chef для WASM — по плану следующие.
 
 ## Next steps
